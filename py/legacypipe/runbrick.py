@@ -301,9 +301,14 @@ def stage_tims(W=3600, H=3600, pixscale=0.262, brickname=None,
         rtn[k] = locals()[k]
     return rtn
 
+
+
 def _coadds(tims, bands, targetwcs,
             mods=None, xy=None, apertures=None, apxy=None,
             ngood=False, detmaps=False,
+
+            outliers=False,
+
             callback=None, callback_args=[],
             plots=False, ps=None):
     class Duck(object):
@@ -342,6 +347,16 @@ def _coadds(tims, bands, targetwcs,
         cowimg = np.zeros((H,W), np.float32)
 
         kwargs = dict(cowimg=cowimg, cow=cow)
+
+        if outliers:
+            '''
+            - (patch images from min/max-subtracted coadd before blurring?)
+            - blur all images to a lowest common denominator & coadd
+            - (with min & max images to clip outliers?)
+            - for each image, find highly discrepant pixels
+            '''
+            comin = np.zeros((H,W), np.float32)
+            comax = np.zeros((H,W), np.float32)
 
         if detmaps:
             detiv = np.zeros((H,W), np.float32)
@@ -383,6 +398,8 @@ def _coadds(tims, bands, targetwcs,
             nobs  = np.zeros((H,W), np.uint8)
             kwargs.update(ormask=ormask, andmask=andmask, nobs=nobs)
 
+        psfsigmas = []
+
         for itim,tim in enumerate(tims):
             if tim.band != band:
                 continue
@@ -410,6 +427,15 @@ def _coadds(tims, bands, targetwcs,
                 con  [Yo,Xo] += goodpix
                 coiv [Yo,Xo] += goodpix * 1./tim.sig1**2  # ...ish
                 del dq
+
+            if outliers:
+                gxo = Xo[goodpix]
+                gyo = Yo[goodpix]
+                comin[gyo,gxo] = np.minimum(comin[gyo,gxo], im[goodpix])
+                comax[gyo,gxo] = np.maximum(comax[gyo,gxo], im[goodpix])
+                del gxo, gyo
+
+                psfsigmas.append(tim.psf_sigma)
 
             if xy:
                 dq = tim.dq[Yi,Xi]
@@ -453,14 +479,194 @@ def _coadds(tims, bands, targetwcs,
             coresid[cow == 0] = 0.
             C.coresids.append(coresid)
 
+        if outliers:
+            # This has to happen before dividing coimg by con!
+            cominmax = coimg - comin - comax
+            cominmax /= np.maximum(con-2, 1)
+            #del comin, comax
+
         if unweighted:
             coimg  /= np.maximum(con, 1)
-            del con
+            #del con
             cowimg[cow == 0] = coimg[cow == 0]
             if mods:
                 cowmod[cow == 0] = comod[cow == 0]
 
-        if plots:
+        if outliers:
+            cominmax[con < 3] = coimg[con < 3]
+
+        if unweighted:
+            del con
+
+        if outliers:
+            from scipy.ndimage.filters import gaussian_filter
+
+            target_sigma = max(psfsigmas) * 1.2
+
+            if plots:
+                meansig1 = np.mean([tim.sig1 for tim in tims if tim.band == band])
+                plt.clf()
+                dimshow(cominmax, vmin=-2.*meansig1, vmax=5.*meansig1)
+                plt.title('cominmax')
+                ps.savefig()
+
+                plt.clf()
+                dimshow(comax, vmin=-2.*meansig1, vmax=5.*meansig1)
+                plt.title('comax')
+                ps.savefig()
+
+            coblur = np.zeros((H,W), np.float32)
+            comin[:,:] = 0
+            comax[:,:] = 0
+            con = np.zeros((H,W), np.uint8)
+
+            # oh man, here we go again            
+            for itim,tim in enumerate(tims):
+                if tim.band != band:
+                    continue
+                R = tim_get_resamp(tim, targetwcs)
+                if R is None:
+                    continue
+                ie = tim.getInvError()
+                # Patch image
+                patchim = tim.getImage().copy()
+
+                # Resample the other direction for patching.
+                try:
+                    Yo,Xo,Yi,Xi,nil = resample_with_wcs(tim.subwcs, targetwcs, [], 2)
+                except OverlapError:
+                    print('No overlap')
+                    continue
+
+                topatch = np.flatnonzero(ie[Yo,Xo] == 0)
+                patchim[Yo[topatch],Xo[topatch]] = cominmax[Yi[topatch],Xi[topatch]]
+                # 
+                blur = np.sqrt(target_sigma**2 - tim.psf_sigma**2)
+                patchim = gaussian_filter(patchim, blur)
+                tim.blurred = patchim
+
+                if plots:
+                    # reie = np.zeros(tim.shape, np.float32)
+                    # reie[Yo,Xo] = ie[Yo,Xo]
+                    # plt.clf()
+                    # dimshow(reie)
+                    # plt.title('ie')
+                    # ps.savefig()
+                    # 
+                    # reie[:,:] = 0
+                    # reie[Yo,Xo] = topatch
+                    # plt.clf()
+                    # dimshow(reie)
+                    # plt.title('topatch')
+                    # ps.savefig()
+
+
+                    plt.clf()
+                    plt.subplot(1,2,1)
+                    lo,hi = -2.*tim.sig1, 5.*tim.sig1
+                    x = np.clip((tim.getImage() - lo) / (hi - lo), 0., 1.)
+                    rgb = np.dstack((x,x,x))
+                    rgb[:,:,0][ie == 0] = 0.
+                    rgb[:,:,1][ie == 0] = 1.
+                    rgb[:,:,2][ie == 0] = 0.
+                    rgb[Yo,Xo,0][topatch] = 1.
+                    rgb[Yo,Xo,1][topatch] = 0.
+                    rgb[Yo,Xo,2][topatch] = 0.
+                    #plt.imshow(tim.getImage(), vmin=-2.*tim.sig1, vmax=5.*tim.sig1)
+                    dimshow(rgb)
+                    plt.title('Tim ' + tim.name)
+
+                    plt.subplot(1,2,2)
+                    #ps.savefig()
+                    #plt.clf()
+                    dimshow(patchim, vmin=-2.*tim.sig1, vmax=5.*tim.sig1, cmap='gray')
+                    plt.title('Patched ' + tim.name)
+                    ps.savefig()
+
+
+                # Now resampling the normal way.
+                (Yo,Xo,Yi,Xi) = R
+
+                # Still don't use masked pixels?
+                good = (ie[Yi,Xi] > 0)
+                Yo = Yo[good]
+                Xo = Xo[good]
+                Yi = Yi[good]
+                Xi = Xi[good]
+                del good
+
+                coblur[Yo,Xo] += patchim[Yi,Xi]
+                comin [Yo,Xo] =  np.minimum(comin[Yo,Xo], patchim[Yi,Xi])
+                comax [Yo,Xo] =  np.maximum(comax[Yo,Xo], patchim[Yi,Xi])
+                con   [Yo,Xo] += 1
+
+            coblurmm = (coblur - comin - comax) / np.maximum(con-2, 1)
+            coblurmm[con < 3] = coblur[con < 3]
+            coblur = coblurmm
+            del coblurmm, comin, comax
+
+            if plots:
+                plt.clf()
+                dimshow(coblur, vmin=-2.*meansig1, vmax=5.*meansig1)
+                plt.title('coblur')
+                ps.savefig()
+
+            # AND... once more around
+            for itim,tim in enumerate(tims):
+                if tim.band != band:
+                    continue
+                R = tim_get_resamp(tim, targetwcs)
+                if R is None:
+                    continue
+                (Yo,Xo,Yi,Xi) = R
+                ie = tim.getInvError()
+                thresh = 5. * tim.sig1
+                hot = (((tim.blurred[Yi,Xi] - coblur[Yo,Xo]) > thresh) *
+                       (con[Yo,Xo] > 0) * (ie[Yi,Xi] > 0) *
+                       ((tim.blurred[Yi,Xi] / coblur[Yo,Xo]) > 2))
+
+                if plots:
+                    coframe = np.zeros((H,W),np.float32)
+                    coie = np.zeros((H,W),np.float32)
+                    cohot = np.zeros((H,W), bool)
+                    coframe[Yo,Xo] = tim.blurred[Yi,Xi]
+                    coie[Yo,Xo] = ie[Yi,Xi]
+                    cohot[Yo,Xo] = hot
+
+                    plt.clf()
+                    plt.subplot(1,2,1)
+                    dimshow(coframe, vmin=-2.*meansig1, vmax=5.*meansig1)
+                    plt.title('blurred ' + str(tim.name))
+                    plt.subplot(1,2,2)
+                    #dimshow(hot, vmin=0, vmax=1, cmap='gray')
+                    dimshow((coie > 0) * (con > 0) *
+                            (coframe / coblur > 2.) *
+                            (coframe - coblur)/tim.sig1, vmin=0, vmax=5, cmap='hot')
+                    plt.title('hot')
+                    ps.savefig()
+
+                    timhot = np.zeros(tim.shape, bool)
+                    timhot[Yi,Xi] = hot
+
+                    plt.clf()
+                    lo,hi = -2.*tim.sig1, 5.*tim.sig1
+                    x = np.clip((tim.getImage() - lo) / (hi - lo), 0., 1.)
+                    rgb = np.dstack((x,x,x))
+                    rgb[:,:,0][tim.getInvError() == 0] = 0.
+                    rgb[:,:,1][tim.getInvError() == 0] = 1.
+                    rgb[:,:,2][tim.getInvError() == 0] = 0.
+                    rgb[:,:,0][timhot] = 1.
+                    rgb[:,:,1][timhot] = 0.
+                    rgb[:,:,2][timhot] = 0.
+                    dimshow(rgb)
+                    plt.title(tim.name + ' new masked: red')
+                    ps.savefig()
+
+                del tim.blurred
+
+            del con, coblur
+
+        if plots and False:
             plt.clf()
             dimshow(nobs, vmin=0, vmax=max(1,nobs.max()), cmap='jet')
             plt.colorbar()
@@ -634,7 +840,7 @@ def stage_image_coadds(targetwcs=None, bands=None, tims=None, outdir=None,
 
     '''
 
-    if plots:
+    if plots and False:
 
         for band in bands:
 
@@ -718,6 +924,8 @@ def stage_image_coadds(targetwcs=None, bands=None, tims=None, outdir=None,
 
                 #############
                 detmaps=True,
+                outliers=True,
+                plots=plots, ps=ps,
 
                 callback=_write_band_images,
                 callback_args=(brickname, version_header, tims, targetwcs, basedir))
