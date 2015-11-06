@@ -5,6 +5,7 @@ import numpy as np
 from legacypipe.common import *
 from legacypipe.image import LegacySurveyImage
 from legacypipe.runbrick import run_brick
+from astrometry.util.util import Tan
 
 class FakeBrick(object):
     def __init__(self):
@@ -58,7 +59,11 @@ class TestingImage(object): #LegacySurveyImage):
         tim.wcsver = ('1', '1')
         tim.band = self.band
         tim.plver = '1'
-		tim.subwcs = #wcs_for_brick(self.get_brick_by_name(), W=3600, H=3600, pixscale=0.262)
+        imagew, imageh= 3600.,3600.
+        pixscale= 0.262/3600.
+        crval1, crval2, crpix1, crpix2= 0.,0.,imagew/2,imageh/2 
+        cd11, cd12, cd21, cd22= -pixscale,0.,0.,pixscale
+        tim.subwcs = Tan(crval1, crval2, crpix1, crpix2, cd11, cd12, cd21, cd22, imagew, imageh)
         return tim
 
 # render testing image in memory
