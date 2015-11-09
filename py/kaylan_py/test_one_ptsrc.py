@@ -73,11 +73,12 @@ class TestingImage(LegacySurveyImage):
         crval1, crval2, crpix1, crpix2= 0., 0., imagew/2., imageh/2.
         cd11, cd12, cd21, cd22= -pixscale,0.,0.,pixscale
         tanwcs = Tan(crval1, crval2, crpix1, crpix2, cd11, cd12, cd21, cd22, imagew, imageh)
-        sig1 = 0.1
+        sig1 = 0.01
+
         image = np.zeros((imageh, imagew), np.float32)
         xx,yy = np.meshgrid(np.arange(imagew), np.arange(imageh))
         cx,cy = imagew/2., imageh/2.
-        flux = 10.
+        flux = 1.
         image += flux * 1./(2.*np.pi * psf_sigma**2) * np.exp(-0.5 * ((xx - cx)**2 + (yy - cy)**2) / psf_sigma**2)
         image += np.random.normal(size=image.shape) * sig1
 
@@ -111,6 +112,9 @@ class TestingImage(LegacySurveyImage):
         tim.x0 = 0
         tim.y0 = 0
         tim.propid = self.ccd.propid
+        tim.imobj = self
+        self.psfnorm = tim.psfnorm
+        self.galnorm = tim.galnorm
         mjd_tai = astropy.time.Time('2000-01-01T00:00:00.000000').tai.mjd
         tim.time = TAITime(None, mjd=mjd_tai)
         return tim
@@ -121,5 +125,6 @@ fakedecals = TestingDecals()
 run_brick(None, decals=fakedecals, blacklist=False,
           writePickles=False, forceAll=True,
           sdssInit=False, wise=False,
-          width=200, height=200)
+          width=200, height=200, outdir='testing',
+          coadd_bw=True)
 
