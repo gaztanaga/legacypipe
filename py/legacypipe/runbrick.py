@@ -2158,7 +2158,7 @@ def _blob_iter(blobslices, blobsrcs, blobs, targetwcs, tims, cat, bands,
 
         hastycho = iblob in tychoblobs
 
-        print('Blob', nblob+1, 'of', len(blobslices), ': blob', iblob,
+        print('Blob', nblob+1, 'of', len(blobslices), ': blob', iblob, 'with',
               len(Isrcs), 'sources, size', blobw, 'x', blobh,
               'center', (bx0+bx1)/2, (by0+by1)/2, 'npix', np.sum(blobmask),
               'one pixel:', onex,oney, 'has Tycho-2 star:', hastycho)
