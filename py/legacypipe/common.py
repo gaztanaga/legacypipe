@@ -1282,6 +1282,8 @@ def run_calibs(X):
 def read_one_tim(X):
     (im, targetrd, kwargs) = X
     print('Reading', im)
+    print('KJB: im has get_tractor_image= ',hasattr(im, 'get_tractor_image'))
+    print('KJB: im=',im,'targetrd= ',targetrd,'kwargs= ',kwargs)
     tim = im.get_tractor_image(radecpoly=targetrd, **kwargs)
     return tim
 

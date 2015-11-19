@@ -34,6 +34,10 @@ class PtfImage(LegacySurveyImage):
         else: 
             print('band != g, band= ',self.band)
             raise ValueError
+        self.dqfn = self.imgfn.replace('science/', 'mask/')
+        self.dqfn = self.dqfn.replace('_scie_', '_mask_')
+        #self.wtfn = self.imgfn.replace('_ooi_', '_oow_')
+
         self.name= self.imgfn
         print('KJB: dir(self)= ',dir(self))
         print('KJB: dir(decals)= ',dir(decals))
@@ -61,15 +65,15 @@ class PtfImage(LegacySurveyImage):
         #self.psffn = os.path.join(calibdir, 'psfex', self.calname + '.fits')
         #self.skyfn = os.path.join(calibdir, 'sky', self.calname + '.fits')
 
-    def get_image_shape(self):
-        return self.height, self.width
+    #def get_image_shape(self):
+    #    return self.height, self.width
 
-    def shape(self):
-        return self.get_image_shape()
+    #def shape(self):
+    #    return self.get_image_shape()
 
-    def get_tractor_image(self, **kwargs):
-        tim = super(PtfImage, self).get_tractor_image(**kwargs)
-        return tim
+    #def get_tractor_image(self, **kwargs):
+    #    tim = super(PtfImage, self).get_tractor_image(**kwargs)
+    #    return tim
 
     def __str__(self):
         return 'PTF ' + self.name
@@ -108,18 +112,15 @@ class PtfImage(LegacySurveyImage):
     def get_good_image_subregion(self):
         pass
        
-    def read_image(self,fname):
+    def read_image(self,**kwargs):
         '''return numpy array of pixels given filename'''
-        F=fitsio.FITS(fname)
-        return F[0].read() 
+        print('Reading image from', self.imgfn, 'hdu', self.hdu)
+        return fitsio.read(self.imgfn, ext=self.hdu, header=True) 
 
-    def read_dq(self, fname, header=False, **kwargs):
+    def read_dq(self,**kwargs):
         '''return "data quality" (flags) image'''
-        from distutils.version import StrictVersion
-        #print('Reading data quality from', self.dqfn, 'hdu', self.hdu)
-        #dq,hdr = self._read_fits(self.dqfn, self.hdu, header=True, **kwargs)
-        F=fitsio.FITS(fname)
-        dq=F[0].read() 
+        print('Reading data quality image from', self.dqfn, 'hdu', self.hdu)
+        return fitsio.read(self.dqfn, ext=self.hdu, header=False) 
         '''
         0 = good, 2 = detected object, all others = bad
         in mask image i see values 0,2,512 not 1,3-15!?
@@ -159,13 +160,11 @@ class PtfImage(LegacySurveyImage):
         #dqbits[dq == 8] |= CP_DQ_BITS['trans']
 
         #dq = dqbits
-        return dq
 
-    def read_invvar(self, f_mask,f_img,clip=True, **kwargs):
-        #print('Reading inverse-variance from', self.wtfn, 'hdu', self.hdu)
-        #invvar = self._read_fits(self.wtfn, self.hdu, **kwargs)
-        mask=self.read_dq(f_mask) 
-        img=self.read_image(f_img)
+    def read_invvar(self, **kwargs):
+        print('*** No Weight Map *** so computing invvar from', self.imgfn, 'and ',self.dqfn,'hdu', self.hdu)
+        mask=self.read_dq() 
+        img,hdr=self.read_image(header=True)
         invvar=np.zeros(img.shape)
         igood= np.where(np.logical_or(mask == 2,mask == 0) == True)
         #ibad= np.where(np.logical_and(mask != 2,mask != 0) == True)
@@ -179,20 +178,248 @@ class PtfImage(LegacySurveyImage):
         return invvar
 
     def read_sky_model(self, **kwargs):
-        #from bok.py
-        img = self.read_image()
+        print('Constant sky model, median of ', self.imgfn)
+        img,hdr = self.read_image(header=True)
         sky = np.median(img)
-        print('Median "sky" model:', sky)
+        print('Median "sky" =', sky)
         sky = ConstantSky(sky)
         sky.version = '0'
         sky.plver = '0'
         return sky
 
-    def run_calibs(self):
+    def run_calibs(self, **kwargs):
+        # def run_calibs(self, pvastrom=True, psfex=True, sky=True, se=False,
+        #           funpack=False, fcopy=False, use_mask=True,
+        #           force=False, just_check=False, git_version=None,
+        #           splinesky=False):
         '''
         Run calibration pre-processing steps.
         '''
+        print('doing Nothing for Calibrations')
         pass
+
+    def get_tractor_image(self, slc=None, radecpoly=None,
+                          gaussPsf=False, const2psf=False, pixPsf=False,
+                          splinesky=False,
+                          nanomaggies=True, subsky=True, tiny=5,
+                          dq=True, invvar=True, pixels=True):
+        '''
+        Returns a tractor.Image ("tim") object for this image.
+        
+        Options describing a subimage to return:
+
+        - *slc*: y,x slice objects
+        - *radecpoly*: numpy array, shape (N,2), RA,Dec polygon describing bounding box to select.
+
+        Options determining the PSF model to use:
+
+        - *gaussPsf*: single circular Gaussian PSF based on header FWHM value.
+        - *const2Psf*: 2-component general Gaussian fit to PsfEx model at image center.
+        - *pixPsf*: pixelized PsfEx model at image center.
+
+        Options determining the sky model to use:
+        
+        - *splinesky*: median filter chunks of the image, then spline those.
+
+        Options determining the units of the image:
+
+        - *nanomaggies*: convert the image to be in units of NanoMaggies;
+          *tim.zpscale* contains the scale value the image was divided by.
+
+        - *subsky*: instantiate and subtract the initial sky model,
+          leaving a constant zero sky model?
+
+        '''
+        from astrometry.util.miscutils import clip_polygon
+        print('#### IN KBJs get tractor image code! ###')
+        get_dq = dq
+        get_invvar = invvar
+        
+        band = self.band
+        imh,imw = self.get_image_shape()
+        print('KJB in get_tractor. dq= ',dq,'invvar= ',invvar,'band= ',band)
+        wcs = self.get_wcs()
+        x0,y0 = 0,0
+        x1 = x0 + imw
+        y1 = y0 + imh
+        #if don't comment out tim = NoneType b/c clips all pixels out
+        #if slc is None and radecpoly is not None:
+        #    imgpoly = [(1,1),(1,imh),(imw,imh),(imw,1)]
+        #    ok,tx,ty = wcs.radec2pixelxy(radecpoly[:-1,0], radecpoly[:-1,1])
+        #    tpoly = zip(tx,ty)
+        #    clip = clip_polygon(imgpoly, tpoly)
+        #    clip = np.array(clip)
+        #    if len(clip) == 0:
+        #        return None
+        #    x0,y0 = np.floor(clip.min(axis=0)).astype(int)
+        #    x1,y1 = np.ceil (clip.max(axis=0)).astype(int)
+        #    slc = slice(y0,y1+1), slice(x0,x1+1)
+        #    if y1 - y0 < tiny or x1 - x0 < tiny:
+        #        print('Skipping tiny subimage')
+        #        return None
+        #if slc is not None:
+        #    sy,sx = slc
+        #    y0,y1 = sy.start, sy.stop
+        #    x0,x1 = sx.start, sx.stop
+
+        #old_extent = (x0,x1,y0,y1)
+        #new_extent = self.get_good_image_slice((x0,x1,y0,y1), get_extent=True)
+        #if new_extent != old_extent:
+        #    x0,x1,y0,y1 = new_extent
+        #    print('Applying good subregion of CCD: slice is', x0,x1,y0,y1)
+        #    if x0 >= x1 or y0 >= y1:
+        #        return None
+        #    slc = slice(y0,y1), slice(x0,x1)
+        if pixels:
+            print('Reading image slice:', slc)
+            img,imghdr = self.read_image(header=True, slice=slc)
+            #print('SATURATE is', imghdr.get('SATURATE', None))
+            #print('Max value in image is', img.max())
+            # check consistency... something of a DR1 hangover
+            #e = imghdr['EXTNAME']
+            #assert(e.strip() == self.ccdname.strip())
+        else:
+            img = np.zeros((imh, imw))
+            imghdr = dict()
+            if slc is not None:
+                img = img[slc]
+            
+        if get_invvar:
+            invvar = self.read_invvar(slice=slc, clipThresh=0.)
+        else:
+            invvar = np.ones_like(img)
+            
+        if get_dq:
+            dq = self.read_dq(slice=slc)
+            invvar[dq != 0] = 0.
+        if np.all(invvar == 0.):
+            print('Skipping zero-invvar image')
+            return None
+        assert(np.all(np.isfinite(img)))
+        assert(np.all(np.isfinite(invvar)))
+        assert(not(np.all(invvar == 0.)))
+
+        # header 'FWHM' is in pixels
+        # imghdr['FWHM']
+        psf_fwhm = self.fwhm 
+        psf_sigma = psf_fwhm / 2.35
+        primhdr = self.read_image_primary_header()
+
+        sky = self.read_sky_model(splinesky=splinesky, slc=slc)
+        midsky = 0.
+        if subsky:
+            print('Instantiating and subtracting sky model...')
+            from tractor.sky import ConstantSky
+            skymod = np.zeros_like(img)
+            sky.addTo(skymod)
+            img -= skymod
+            midsky = np.median(skymod)
+            zsky = ConstantSky(0.)
+            zsky.version = sky.version
+            zsky.plver = sky.plver
+            del skymod
+            del sky
+            sky = zsky
+            del zsky
+
+        magzp = self.decals.get_zeropoint_for(self)
+        orig_zpscale = zpscale = NanoMaggies.zeropointToScale(magzp)
+        if nanomaggies:
+            # Scale images to Nanomaggies
+            img /= zpscale
+            invvar *= zpscale**2
+            if not subsky:
+                sky.scale(1./zpscale)
+            zpscale = 1.
+
+        assert(np.sum(invvar > 0) > 0)
+        if get_invvar:
+            sig1 = 1./np.sqrt(np.median(invvar[invvar > 0]))
+        else:
+            # Estimate from the image?
+            # # Estimate per-pixel noise via Blanton's 5-pixel MAD
+            slice1 = (slice(0,-5,10),slice(0,-5,10))
+            slice2 = (slice(5,None,10),slice(5,None,10))
+            mad = np.median(np.abs(img[slice1] - img[slice2]).ravel())
+            sig1 = 1.4826 * mad / np.sqrt(2.)
+            print('sig1 estimate:', sig1)
+            invvar *= (1. / sig1**2)
+            
+        assert(np.all(np.isfinite(img)))
+        assert(np.all(np.isfinite(invvar)))
+        assert(np.isfinite(sig1))
+
+        if subsky:
+            ##
+            imgmed = np.median(img[invvar>0])
+            if np.abs(imgmed) > sig1:
+                print('WARNING: image median', imgmed, 'is more than 1 sigma away from zero!')
+                # Boom!
+                assert(False)
+
+        twcs = ConstantFitsWcs(wcs)
+        if x0 or y0:
+            twcs.setX0Y0(x0,y0)
+
+        #print('gaussPsf:', gaussPsf, 'pixPsf:', pixPsf, 'const2psf:', const2psf)
+        psf = self.read_psf_model(x0, y0, gaussPsf=gaussPsf, pixPsf=pixPsf,
+                                  const2psf=const2psf, psf_sigma=psf_sigma)
+
+        tim = Image(img, invvar=invvar, wcs=twcs, psf=psf,
+                    photocal=LinearPhotoCal(zpscale, band=band),
+                    sky=sky, name=self.name + ' ' + band)
+        assert(np.all(np.isfinite(tim.getInvError())))
+
+        # PSF norm
+        psfnorm = self.psf_norm(tim)
+        print('PSF norm', psfnorm, 'vs Gaussian',
+              1./(2. * np.sqrt(np.pi) * psf_sigma))
+
+        # Galaxy-detection norm
+        tim.band = band
+        galnorm = self.galaxy_norm(tim)
+        print('Galaxy norm:', galnorm)
+        
+        # CP (DECam) images include DATE-OBS and MJD-OBS, in UTC.
+        import astropy.time
+        #mjd_utc = mjd=primhdr.get('MJD-OBS', 0)
+        mjd_tai = astropy.time.Time(primhdr['DATE-OBS']).tai.mjd
+        tim.slice = slc
+        tim.time = TAITime(None, mjd=mjd_tai)
+        tim.zr = [-3. * sig1, 10. * sig1]
+        tim.zpscale = orig_zpscale
+        tim.midsky = midsky
+        tim.sig1 = sig1
+        tim.psf_fwhm = psf_fwhm
+        tim.psf_sigma = psf_sigma
+        tim.propid = self.propid
+        tim.psfnorm = psfnorm
+        tim.galnorm = galnorm
+        tim.sip_wcs = wcs
+        tim.x0,tim.y0 = int(x0),int(y0)
+        tim.imobj = self
+        tim.primhdr = primhdr
+        tim.hdr = imghdr
+        tim.plver = primhdr['PLVER'].strip()
+        tim.skyver = (sky.version, sky.plver)
+        tim.wcsver = (wcs.version, wcs.plver)
+        tim.psfver = (psf.version, psf.plver)
+        if get_dq:
+            tim.dq = dq
+        tim.dq_bits = CP_DQ_BITS
+        tim.saturation = imghdr.get('SATURATE', None)
+        tim.satval = tim.saturation or 0.
+        if subsky:
+            tim.satval -= midsky
+        if nanomaggies:
+            tim.satval /= orig_zpscale
+        subh,subw = tim.shape
+        tim.subwcs = tim.sip_wcs.get_subimage(tim.x0, tim.y0, subw, subh)
+        mn,mx = tim.zr
+        tim.ima = dict(interpolation='nearest', origin='lower', cmap='gray',
+                       vmin=mn, vmax=mx)
+        return tim
+
 
 class PtfDecals(Decals):
     def __init__(self, **kwargs):

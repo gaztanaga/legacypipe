@@ -326,6 +326,8 @@ def stage_tims(W=3600, H=3600, pixscale=0.262, brickname=None,
             plt.title('Pixel distributions: %s band' % b)
             ps.savefig()
 
+    for myim in ims:
+        print('KJB: ims still there?:',im, im.band, 'exptime', im.exptime, 'propid', ccd.propid)
 
     # Read Tractor images
     args = [(im, targetrd, dict(gaussPsf=gaussPsf, const2psf=const2psf,
