@@ -57,7 +57,8 @@ class LegacySurveyImage(object):
             self.imgfn = imgfn
         else:
             self.imgfn = os.path.join(self.decals.get_image_dir(), imgfn)
-
+            print("KJB: imgfn= ",self.imgfn)
+        
         self.hdu     = ccd.image_hdu
         self.expnum  = ccd.expnum
         self.ccdname = ccd.ccdname.strip()

@@ -1276,6 +1276,7 @@ def run_calibs(X):
     im = X[0]
     kwargs = X[1]
     print('run_calibs for image', im)
+    print('KJB: in run_calibs: im=',im,'kwargs= ',kwargs)
     return im.run_calibs(**kwargs)
 
 def read_one_tim(X):

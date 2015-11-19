@@ -2,7 +2,7 @@ from __future__ import print_function
 import os
 import numpy as np
 
-from legacypipe.decam import DecamImage
+from legacypipe.image import LegacySurveyImage
 from legacypipe.common import *
 
 import fitsio
@@ -15,7 +15,8 @@ Code specific to images from the (intermediate) Palomar Transient Factory (iPTF/
 11 CCDs and 1.2m telescope at Palomar Observatory.
 '''
 
-class PtfImage(DecamImage):
+
+class PtfImage(LegacySurveyImage):
     '''
    
     A LegacySurveyImage subclass to handle images from the Dark Energy
@@ -24,6 +25,22 @@ class PtfImage(DecamImage):
     '''
     def __init__(self, decals, t):
         super(PtfImage, self).__init__(decals, t)
+        if self.band == 'g':
+            ind=self.imgfn.rfind('images/')
+            beg=self.imgfn[:ind+len('images/')]
+            end=self.imgfn[ind+len('images/'):]
+            mid='ptf/ptf_22694/gband/science/'
+            self.imgfn=beg+mid+end 
+        else: 
+            print('band != g, band= ',self.band)
+            raise ValueError
+        self.name= self.imgfn
+        print('KJB: dir(self)= ',dir(self))
+        print('KJB: dir(decals)= ',dir(decals))
+        #for i in dir(self):
+        #    if i.startswith('__'): continue
+        #    else: print('self.%s= ' % i,getattr(self, i))
+
         #self.dqfn = self.imgfn.replace('_ooi_', '_ood_')
         #self.wtfn = self.imgfn.replace('_ooi_', '_oow_')
 
@@ -37,15 +54,56 @@ class PtfImage(DecamImage):
         #            print('Using      ', fun)
         #            print('rather than', fn)
         #            setattr(self, attr, fun)
-
+        print('KJB: calib_dir= ',self.decals.get_calib_dir(),'camera=',self.camera)
         #calibdir = os.path.join(self.decals.get_calib_dir(), self.camera)
         #self.pvwcsfn = os.path.join(calibdir, 'astrom-pv', self.calname + '.wcs.fits')
         #self.sefn = os.path.join(calibdir, 'sextractor', self.calname + '.fits')
         #self.psffn = os.path.join(calibdir, 'psfex', self.calname + '.fits')
         #self.skyfn = os.path.join(calibdir, 'sky', self.calname + '.fits')
 
+    def get_image_shape(self):
+        return self.height, self.width
+
+    def shape(self):
+        return self.get_image_shape()
+
+    def get_tractor_image(self, **kwargs):
+        tim = super(PtfImage, self).get_tractor_image(**kwargs)
+        return tim
+
     def __str__(self):
         return 'PTF ' + self.name
+    
+    #override funcs get_tractor_image calls
+    def get_wcs(self):
+        return self.read_pv_wcs()
+
+    def read_pv_wcs(self):
+        '''extract wcs from fits header directly'''
+        hdr = fitsio.read_header(self.imgfn, self.hdu)
+        H,W = self.get_image_shape()
+        wcs= Tan(hdr['CRVAL1'], hdr['CRVAL2'],hdr['CRPIX1'],hdr['CRPIX2'],\
+                     hdr['CD1_1'],hdr['CD1_2'],hdr['CD2_1'],hdr['CD2_2'],\
+                     float(W),float(H))
+        return wcs
+    #    wcs.version = '0' #done in bok.py 
+    #    wcs.plver = '0'
+    #    return wcs
+        #from astrometry.util.util import Sip
+        #print('Reading WCS from', self.pvwcsfn)
+        #wcs = Sip(self.pvwcsfn)
+        #dra,ddec = self.decals.get_astrometric_zeropoint_for(self)
+        #r,d = wcs.get_crval()
+        #print('Applying astrometric zeropoint:', (dra,ddec))
+        #wcs.set_crval((r + dra, d + ddec))
+        #hdr = fitsio.read_header(self.pvwcsfn)
+        #wcs.version = hdr.get('LEGPIPEV', '')
+        #if len(wcs.version) == 0:
+        #    wcs.version = hdr.get('TRACTORV', '').strip()
+        #    if len(wcs.version) == 0:
+        #        wcs.version = str(os.stat(self.pvwcsfn).st_mtime)
+        #wcs.plver = hdr.get('PLVER', '').strip()
+        #return wcs
 
     def get_good_image_subregion(self):
         pass
@@ -119,13 +177,6 @@ class PtfImage(DecamImage):
         #    thresh = 0.2 * med
         #    invvar[invvar < thresh] = 0
         return invvar
-
-    def get_wcs(self):
-        wcs= Tan(self.crval1[i], self.crval2[i], self.crpix1[i], self.crpix2[i],
-                  self.cd1_1[i], self.cd1_2[i], self.cd2_1[i], self.cd2_2[i], self.width, self.height)
-        wcs.version = '0' #done in bok.py 
-        wcs.plver = '0'
-        return wcs
 
     def read_sky_model(self, **kwargs):
         #from bok.py
