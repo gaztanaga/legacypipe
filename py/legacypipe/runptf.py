@@ -16,6 +16,57 @@ Code specific to images from the (intermediate) Palomar Transient Factory (iPTF/
 11 CCDs and 1.2m telescope at Palomar Observatory.
 '''
 
+#### test code
+class TestCode(object):
+    def __init__(self):
+        pass
+
+    def read_image(self,imgfn,**kwargs):
+        '''return numpy array of pixels given filename'''
+        return fitsio.read(imgfn, ext=0, header=True) 
+
+    def read_dq(self,dqfn,**kwargs):
+        '''return bit mask which Tractor calls "data quality" image
+        PTF DMASK BIT DEFINITIONS
+        BIT00   =                    0 / AIRCRAFT/SATELLITE TRACK
+        BIT01   =                    1 / OBJECT (detected by SExtractor)
+        BIT02   =                    2 / HIGH DARK-CURRENT
+        BIT03   =                    3 / RESERVED FOR FUTURE USE
+        BIT04   =                    4 / NOISY
+        BIT05   =                    5 / GHOST
+        BIT06   =                    6 / CCD BLEED
+        BIT07   =                    7 / RAD HIT
+        BIT08   =                    8 / SATURATED
+        BIT09   =                    9 / DEAD/BAD
+        BIT10   =                   10 / NAN (not a number)
+        BIT11   =                   11 / DIRTY (10-sigma below coarse local median)
+        BIT12   =                   12 / HALO
+        BIT13   =                   13 / RESERVED FOR FUTURE USE
+        BIT14   =                   14 / RESERVED FOR FUTURE USE
+        BIT15   =                   15 / RESERVED FOR FUTURE USE
+        INFOBITS=                    0 / Database infobits (2^2 and 2^3 excluded)
+        '''
+        dq= fitsio.read(dqfn, ext=0, header=False)
+        return dq.astype(np.int16)
+        
+    def read_invvar(self,imgfn,dqfn, clip=False, clipThresh=0.2, **kwargs):
+        print('*** No Weight Map *** computing invvar with image and data quality mapd')
+        dq=read_dq(dqfn) 
+        img,hdr=read_image(imgfn,header=True)
+        assert(dq.shape == img.shape)
+        invvar=np.zeros(img.shape)
+        invvar[dq == 0]= np.power(invvar[dq == 0],-0.5)
+        if clip:
+            # Clamp near-zero (incl negative!) invvars to zero.
+            # These arise due to fpack.
+            if clipThresh > 0.:
+                med = np.median(invvar[invvar > 0])
+                thresh = clipThresh * med
+            else:
+                thresh = 0.
+            invvar[invvar < thresh] = 0
+        return invvar
+####
 
 class PtfImage(LegacySurveyImage):
     '''
