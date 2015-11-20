@@ -43,7 +43,7 @@ def exposure_metadata(filenames, hdus=None, trim=None):
     allkeys = primkeys + hdrkeys + otherkeys
     #for each hdu and file, append ptf header info to vals
     vals = dict([(k,[]) for k,d in allkeys])
-    for i,fn in enumerate(filenames[:10]):
+    for i,fn in enumerate(filenames[:4]):
         print('Reading', (i+1), 'of', len(filenames), ':', fn)
         F = fitsio.FITS(fn)
         cpfn = fn

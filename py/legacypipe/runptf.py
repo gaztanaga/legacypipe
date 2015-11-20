@@ -9,6 +9,7 @@ import fitsio
 from astrometry.util.file import trymakedirs
 from astrometry.util.fits import fits_table
 from astrometry.util.util import Tan, Sip, anwcs_t
+from tractor.tractortime import TAITime
 
 '''
 Code specific to images from the (intermediate) Palomar Transient Factory (iPTF/PTF), bands = g,R.
@@ -323,6 +324,9 @@ class PtfImage(LegacySurveyImage):
             del zsky
 
         magzp = self.decals.get_zeropoint_for(self)
+        if isinstance(magzp,str): 
+            print('WARNING: no ZeroPoint in header for image: ',self.imgfn)
+            magzp= 23.
         orig_zpscale = zpscale = NanoMaggies.zeropointToScale(magzp)
         if nanomaggies:
             # Scale images to Nanomaggies
@@ -400,9 +404,9 @@ class PtfImage(LegacySurveyImage):
         tim.imobj = self
         tim.primhdr = primhdr
         tim.hdr = imghdr
-        tim.plver = primhdr['PLVER'].strip()
+        tim.plver = str(primhdr['PTFVERSN']).strip()
         tim.skyver = (sky.version, sky.plver)
-        tim.wcsver = (wcs.version, wcs.plver)
+        tim.wcsver = ('-1','-1') #wcs.version, wcs.plver)
         tim.psfver = (psf.version, psf.plver)
         if get_dq:
             tim.dq = dq
@@ -425,7 +429,29 @@ class PtfDecals(Decals):
     def __init__(self, **kwargs):
         super(PtfDecals, self).__init__(**kwargs)
         self.image_typemap.update({'ptf' : PtfImage})
- 
+
+    def get_zeropoint_for(self,tractor_image):
+        print('ZEROPOINT from KJB!!!!!!!!!!')
+        hdr=fitsio.read_header(tractor_image.imgfn)
+        return hdr['IMAGEZPT']
+    
+    def ccds_touching_wcs(self, wcs, **kwargs):
+        '''PTF testing, continue even if no overlap with DECaLS bricks
+        '''
+        print('### using KJBs ccds_touching_wcs')
+        T = self.get_ccds_readonly()
+        #I = ccds_touching_wcs(wcs, T, **kwargs)
+        #if len(I) == 0:
+        #    return None
+        #T = T[I]
+        return T
+
+    def photometric_ccds(self, CCD):
+        '''PTF testing process non-photometric ccds too'''
+        print('>>>> KJBs photometric ccds')
+        good = np.ones(len(CCD), bool)
+        return np.flatnonzero(good)
+
 def main():
     from runbrick import run_brick, get_parser, get_runbrick_kwargs
     
@@ -444,7 +470,7 @@ def main():
 
     decals = PtfDecals(decals_dir=opt.decals_dir)
     kwargs['decals'] = decals
-    
+
     # runbrick...
     run_brick(opt.brick, **kwargs)
     return 0

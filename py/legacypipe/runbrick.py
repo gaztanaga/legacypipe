@@ -80,8 +80,7 @@ def stage_tims(W=3600, H=3600, pixscale=0.262, brickname=None,
                splinesky=False,
                use_blacklist = True,
                mp=None,
-               rsync=False, 
-               ccdTouch=True,ccdPhot=True,
+               rsync=False,
                **kwargs):
     '''
     This is the first stage in the pipeline.  It
@@ -207,32 +206,29 @@ def stage_tims(W=3600, H=3600, pixscale=0.262, brickname=None,
     # print('Version header:')
     # print(version_hdr)
 
-    if ccdTouch:
-        ccds = decals.ccds_touching_wcs(targetwcs, ccdrad=None)
-        if ccds is None:
-            raise NothingToDoError('No CCDs touching brick')
-        print(len(ccds), 'CCDs touching target WCS')
-        
-        if use_blacklist:
-            I = decals.apply_blacklist(ccds)
-            ccds.cut(I)
-            print(len(ccds), 'CCDs not in blacklisted propids (too many exposures!)')
-    else: ccds= decals.get_ccds_readonly()
+    ccds = decals.ccds_touching_wcs(targetwcs, ccdrad=None)
+    if ccds is None:
+        raise NothingToDoError('No CCDs touching brick')
+    print(len(ccds), 'CCDs touching target WCS')
+
+    if use_blacklist:
+        I = decals.apply_blacklist(ccds)
+        ccds.cut(I)
+        print(len(ccds), 'CCDs not in blacklisted propids (too many exposures!)')
+
     # Sort images by band -- this also eliminates images whose
     # *image.filter* string is not in *bands*.
     ccds.cut(np.hstack([np.flatnonzero(ccds.filter == band) for band in bands]))
 
-    if ccdPhot:
-        print('Cutting out non-photometric CCDs...')
-        I = decals.photometric_ccds(ccds)
-        print(len(I), 'of', len(ccds), 'CCDs are photometric')
-        ccds.cut(I)
+    print('Cutting out non-photometric CCDs...')
+    I = decals.photometric_ccds(ccds)
+    print(len(I), 'of', len(ccds), 'CCDs are photometric')
+    ccds.cut(I)
 
     ims = []
     for ccd in ccds:
         im = decals.get_image_object(ccd)
         ims.append(im)
-
         print(im, im.band, 'exptime', im.exptime, 'propid', ccd.propid)
 
     tnow = Time()
@@ -285,7 +281,6 @@ def stage_tims(W=3600, H=3600, pixscale=0.262, brickname=None,
 
         # Run calibrations
         args = [(im, kwa) for im in ims]
-        print('KJB in runbrick do_calibs, im= ',im,'args= ',args)
         mp.map(run_calibs, args)
         tnow = Time()
         print('[parallel tims] Calibrations:', tnow-tlast)
@@ -326,32 +321,27 @@ def stage_tims(W=3600, H=3600, pixscale=0.262, brickname=None,
             plt.title('Pixel distributions: %s band' % b)
             ps.savefig()
 
-    for myim in ims:
-        print('KJB: ims still there?:',im, im.band, 'exptime', im.exptime, 'propid', ccd.propid)
 
     # Read Tractor images
     args = [(im, targetrd, dict(gaussPsf=gaussPsf, const2psf=const2psf,
                                 pixPsf=pixPsf, splinesky=splinesky)) for im in ims]
     tims = mp.map(read_one_tim, args)
-    print('KJB: len(tims)= ',len(tims),'type(tims[0])',type(tims[0]))
 
     tnow = Time()
     print('[parallel tims] Read', len(ccds), 'images:', tnow-tlast)
     tlast = tnow
 
-    if ccdPhot:
-        # Cut the table of CCDs to match the 'tims' list
-        I = np.flatnonzero(np.array([tim is not None for tim in tims]))
-        ccds.cut(I)
-        tims = [tim for tim in tims if tim is not None]
-        assert(len(ccds) == len(tims))
-        
+    # Cut the table of CCDs to match the 'tims' list
+    I = np.flatnonzero(np.array([tim is not None for tim in tims]))
+    ccds.cut(I)
+    tims = [tim for tim in tims if tim is not None]
+    assert(len(ccds) == len(tims))
+
     if len(tims) == 0:
         raise NothingToDoError('No photometric CCDs touching brick.')
 
     npix = 0
     for tim in tims:
-        print('KJB: type(tim)= ',type(tim),'dir(tim)= ',dir(tim))
         h,w = tim.shape
         npix += h*w
     print('Total of', npix, 'pixels read')
@@ -4831,8 +4821,6 @@ def run_brick(brick, radec=None, pixscale=0.262,
 
     t0 = Time()
 
-    kwargs['ccdTouch']=False
-    kwargs['ccdPhot']=False
     for stage in stages:
         runstage(stage, picklePattern, stagefunc, prereqs=prereqs,
                  initial_args=initargs, **kwargs)

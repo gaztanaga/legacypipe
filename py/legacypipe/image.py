@@ -57,8 +57,7 @@ class LegacySurveyImage(object):
             self.imgfn = imgfn
         else:
             self.imgfn = os.path.join(self.decals.get_image_dir(), imgfn)
-            print("KJB: imgfn= ",self.imgfn)
-        
+
         self.hdu     = ccd.image_hdu
         self.expnum  = ccd.expnum
         self.ccdname = ccd.ccdname.strip()
@@ -157,7 +156,7 @@ class LegacySurveyImage(object):
         
         band = self.band
         imh,imw = self.get_image_shape()
-        print('KJB in get_tractor. dq= ',dq,'invvar= ',invvar,'band= ',band)
+
         wcs = self.get_wcs()
         x0,y0 = 0,0
         x1 = x0 + imw
@@ -166,12 +165,10 @@ class LegacySurveyImage(object):
             imgpoly = [(1,1),(1,imh),(imw,imh),(imw,1)]
             ok,tx,ty = wcs.radec2pixelxy(radecpoly[:-1,0], radecpoly[:-1,1])
             tpoly = zip(tx,ty)
-            clip = clip_polygon(imgpoly, imgpoly)#tpoly)
+            clip = clip_polygon(imgpoly, tpoly)
             clip = np.array(clip)
-            print('################## len(clip)= ',clip)
             if len(clip) == 0:
                 return None
-            print('##################')
             x0,y0 = np.floor(clip.min(axis=0)).astype(int)
             x1,y1 = np.ceil (clip.max(axis=0)).astype(int)
             slc = slice(y0,y1+1), slice(x0,x1+1)
@@ -184,16 +181,14 @@ class LegacySurveyImage(object):
             x0,x1 = sx.start, sx.stop
 
         old_extent = (x0,x1,y0,y1)
-        new_extent= old_extent #KJB
-        print('KJB: ### pixels = ',pixels)
-        #KJB
-        #new_extent = self.get_good_image_slice((x0,x1,y0,y1), get_extent=True)
-        #if new_extent != old_extent:
-        #    x0,x1,y0,y1 = new_extent
-        #    print('Applying good subregion of CCD: slice is', x0,x1,y0,y1)
-        #    if x0 >= x1 or y0 >= y1:
-        #        return None
-        #    slc = slice(y0,y1), slice(x0,x1)
+        new_extent = self.get_good_image_slice((x0,x1,y0,y1), get_extent=True)
+        if new_extent != old_extent:
+            x0,x1,y0,y1 = new_extent
+            print('Applying good subregion of CCD: slice is', x0,x1,y0,y1)
+            if x0 >= x1 or y0 >= y1:
+                return None
+            slc = slice(y0,y1), slice(x0,x1)
+
         if pixels:
             print('Reading image slice:', slc)
             img,imghdr = self.read_image(header=True, slice=slc)
