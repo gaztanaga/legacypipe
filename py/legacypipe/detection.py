@@ -172,7 +172,7 @@ def run_sed_matched_filters(SEDs, bands, detmaps, detivs, omit_xy,
     # New peaks:
     peakx = xx[n0:]
     peaky = yy[n0:]
-
+    if isinstance(peakx,list): peakx,peaky= np.array(peakx),np.array(peaky)
     # Add sources for the new peaks we found
     pr,pd = targetwcs.pixelxy2radec(peakx+1, peaky+1)
     print('Adding', len(pr), 'new sources')
