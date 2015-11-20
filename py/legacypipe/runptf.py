@@ -40,8 +40,6 @@ class PtfImage(LegacySurveyImage):
         #self.wtfn = self.imgfn.replace('_ooi_', '_oow_')
 
         self.name= self.imgfn
-        print('KJB: dir(self)= ',dir(self))
-        print('KJB: dir(decals)= ',dir(decals))
         #for i in dir(self):
         #    if i.startswith('__'): continue
         #    else: print('self.%s= ' % i,getattr(self, i))
@@ -59,7 +57,6 @@ class PtfImage(LegacySurveyImage):
         #            print('Using      ', fun)
         #            print('rather than', fn)
         #            setattr(self, attr, fun)
-        print('KJB: calib_dir= ',self.decals.get_calib_dir(),'camera=',self.camera)
         #calibdir = os.path.join(self.decals.get_calib_dir(), self.camera)
         #self.pvwcsfn = os.path.join(calibdir, 'astrom-pv', self.calname + '.wcs.fits')
         #self.sefn = os.path.join(calibdir, 'sextractor', self.calname + '.fits')
@@ -119,12 +116,8 @@ class PtfImage(LegacySurveyImage):
         return fitsio.read(self.imgfn, ext=self.hdu, header=True) 
 
     def read_dq(self,**kwargs):
-        '''return "data quality" (flags) image'''
-        print('Reading data quality image from', self.dqfn, 'hdu', self.hdu)
-        return fitsio.read(self.dqfn, ext=self.hdu, header=False) 
-        '''
-        0 = good, 2 = detected object, all others = bad
-        in mask image i see values 0,2,512 not 1,3-15!?
+        '''return bit mask which Tractor calls "data quality" image
+        PTF DMASK BIT DEFINITIONS
         BIT00   =                    0 / AIRCRAFT/SATELLITE TRACK
         BIT01   =                    1 / OBJECT (detected by SExtractor)
         BIT02   =                    2 / HIGH DARK-CURRENT
@@ -141,41 +134,28 @@ class PtfImage(LegacySurveyImage):
         BIT13   =                   13 / RESERVED FOR FUTURE USE
         BIT14   =                   14 / RESERVED FOR FUTURE USE
         BIT15   =                   15 / RESERVED FOR FUTURE USE
-        #1 = bad
-        #2 = no value (for remapped and stacked data)
-        #3 = saturated
-        #4 = bleed mask
-        #5 = cosmic ray
-        #6 = low weight
-        #7 = diff detect (multi-exposure difference detection from median)
-        #8 = long streak (e.g. satellite trail)
+        INFOBITS=                    0 / Database infobits (2^2 and 2^3 excluded)
         '''
-        #dqbits = np.zeros(dq.shape, np.int16)
-        #dqbits[dq == 1] |= CP_DQ_BITS['badpix']
-        #dqbits[dq == 2] |= CP_DQ_BITS['badpix']
-        #dqbits[dq == 3] |= CP_DQ_BITS['satur']
-        #dqbits[dq == 4] |= CP_DQ_BITS['bleed']
-        #dqbits[dq == 5] |= CP_DQ_BITS['cr']
-        #dqbits[dq == 6] |= CP_DQ_BITS['badpix']
-        #dqbits[dq == 7] |= CP_DQ_BITS['trans']
-        #dqbits[dq == 8] |= CP_DQ_BITS['trans']
-
-        #dq = dqbits
-
-    def read_invvar(self, **kwargs):
-        print('*** No Weight Map *** so computing invvar from', self.imgfn, 'and ',self.dqfn,'hdu', self.hdu)
-        mask=self.read_dq() 
+        print('Reading data quality image from', self.dqfn, 'hdu', self.hdu)
+        dq= fitsio.read(self.dqfn, ext=self.hdu, header=False)
+        return dq.astype(np.int16)
+    
+    def read_invvar(self, clip=False, clipThresh=0.2, **kwargs):
+        print('*** No Weight Map *** computing invvar with image and data quality mapd')
+        dq=self.read_dq() 
         img,hdr=self.read_image(header=True)
+        assert(dq.shape == img.shape)
         invvar=np.zeros(img.shape)
-        igood= np.where(np.logical_or(mask == 2,mask == 0) == True)
-        #ibad= np.where(np.logical_and(mask != 2,mask != 0) == True)
-        invvar[igood]= np.power(img[igood],-0.5) 
-        #if clip:
-        #    # Clamp near-zero (incl negative!) invvars to zero.
-        #    # These arise due to fpack.
-        #    med = np.median(invvar[invvar > 0])
-        #    thresh = 0.2 * med
-        #    invvar[invvar < thresh] = 0
+        invvar[dq == 0]= np.power(invvar[dq == 0],-0.5)
+        if clip:
+            # Clamp near-zero (incl negative!) invvars to zero.
+            # These arise due to fpack.
+            if clipThresh > 0.:
+                med = np.median(invvar[invvar > 0])
+                thresh = clipThresh * med
+            else:
+                thresh = 0.
+            invvar[invvar < thresh] = 0
         return invvar
 
     def read_sky_model(self, **kwargs):
@@ -238,7 +218,6 @@ class PtfImage(LegacySurveyImage):
         
         band = self.band
         imh,imw = self.get_image_shape()
-        print('KJB in get_tractor. dq= ',dq,'invvar= ',invvar,'band= ',band)
         wcs = self.get_wcs()
         x0,y0 = 0,0
         x1 = x0 + imw
@@ -431,24 +410,24 @@ class PtfDecals(Decals):
         self.image_typemap.update({'ptf' : PtfImage})
 
     def get_zeropoint_for(self,tractor_image):
-        print('ZEROPOINT from KJB!!!!!!!!!!')
+        print('WARNING: zeropoints from header of ',tractor_image.imgfn)
         hdr=fitsio.read_header(tractor_image.imgfn)
         return hdr['IMAGEZPT']
     
     def ccds_touching_wcs(self, wcs, **kwargs):
         '''PTF testing, continue even if no overlap with DECaLS bricks
         '''
-        print('### using KJBs ccds_touching_wcs')
+        print('WARNING: ccds do not have to be overlapping with DECaLS bricks')
         T = self.get_ccds_readonly()
-        #I = ccds_touching_wcs(wcs, T, **kwargs)
-        #if len(I) == 0:
-        #    return None
-        #T = T[I]
+        I = ccds_touching_wcs(wcs, T, **kwargs)
+        if len(I) == 0:
+            return None
+        T = T[I]
         return T
 
     def photometric_ccds(self, CCD):
         '''PTF testing process non-photometric ccds too'''
-        print('>>>> KJBs photometric ccds')
+        print('WARNING: non-photometric ccds allowed')
         good = np.ones(len(CCD), bool)
         return np.flatnonzero(good)
 
