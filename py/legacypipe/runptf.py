@@ -78,16 +78,7 @@ class PtfImage(LegacySurveyImage):
     '''
     def __init__(self, decals, t):
         super(PtfImage, self).__init__(decals, t)
-        if self.band == 'g':
-            ind=self.imgfn.rfind('images/')
-            beg=self.imgfn[:ind+len('images/')]
-            end=self.imgfn[ind+len('images/'):]
-            mid='ptf/ptf_22694/gband/science/'
-            self.imgfn=beg+mid+end 
-        else: 
-            print('band != g, band= ',self.band)
-            raise ValueError
-        self.dqfn = self.imgfn.replace('science/', 'mask/')
+        self.dqfn= os.path.join(os.path.dirname(self.imgfn),'../mask',os.path.basename(self.imgfn))
         self.dqfn = self.dqfn.replace('_scie_', '_mask_')
         #self.wtfn = self.imgfn.replace('_ooi_', '_oow_')
 
@@ -467,22 +458,40 @@ class PtfDecals(Decals):
         hdr=fitsio.read_header(tractor_image.imgfn)
         return hdr['IMAGEZPT']
     
-    def ccds_touching_wcs(self, wcs, **kwargs):
-        '''PTF testing, continue even if no overlap with DECaLS bricks
-        '''
-        print('WARNING: ccds do not have to be overlapping with DECaLS bricks')
-        T = self.get_ccds_readonly()
-        I = ccds_touching_wcs(wcs, T, **kwargs)
-        if len(I) == 0:
-            return None
-        T = T[I]
-        return T
+    #def ccds_touching_wcs(self, wcs, **kwargs):
+    #    '''PTF testing, continue even if no overlap with DECaLS bricks
+    #    '''
+    #    print('WARNING: ccds do not have to be overlapping with DECaLS bricks')
+    #    T = self.get_ccds_readonly()
+    #    I = ccds_touching_wcs(wcs, T, **kwargs)
+    #    if len(I) == 0:
+    #        return None
+    #    T = T[I]
+    #    return T
 
     def photometric_ccds(self, CCD):
         '''PTF testing process non-photometric ccds too'''
         print('WARNING: non-photometric ccds allowed')
         good = np.ones(len(CCD), bool)
         return np.flatnonzero(good)
+    
+    def get_ccds(self):
+        '''
+        Return SMALL CCD for testing: 2 rows
+        '''
+        fn = os.path.join(self.decals_dir, 'decals-ccds.fits')
+        if not os.path.exists(fn):
+            fn += '.gz'
+        print('Reading CCDs from', fn)
+        T = fits_table(fn)
+        print('Got', len(T), 'CCDs')
+        if 'ccdname' in T.columns():
+            # "N4 " -> "N4"
+            T.ccdname = np.array([s.strip() for s in T.ccdname])
+        T= T[ [np.where(T.filter == 'R')[0][0],np.where(T.filter == 'g')[0][0]] ] #1 R and 1 g band
+        print('ccd ra= ',T.ra,'ccd dec= ',T.dec) 
+        return T
+
 
 def main():
     from runbrick import run_brick, get_parser, get_runbrick_kwargs
@@ -502,6 +511,8 @@ def main():
 
     decals = PtfDecals(decals_dir=opt.decals_dir)
     kwargs['decals'] = decals
+    
+    kwargs['bands'] = 'gR'
 
     # runbrick...
     run_brick(opt.brick, **kwargs)
