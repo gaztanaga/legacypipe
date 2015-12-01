@@ -55,7 +55,8 @@ class TestCode(object):
         img,hdr=read_image(imgfn,header=True)
         assert(dq.shape == img.shape)
         invvar=np.zeros(img.shape)
-        invvar[dq == 0]= np.power(invvar[dq == 0],-0.5)
+        invvar[dq == 0]= np.power(img[dq == 0],-0.5)
+        invvar[dq == 2]= np.power(img[dq == 2],-0.5) #SExtractor ojbect if binary(00010) = 2
         if clip:
             # Clamp near-zero (incl negative!) invvars to zero.
             # These arise due to fpack.
@@ -190,14 +191,15 @@ class PtfImage(LegacySurveyImage):
         print('Reading data quality image from', self.dqfn, 'hdu', self.hdu)
         dq= fitsio.read(self.dqfn, ext=self.hdu, header=False)
         return dq.astype(np.int16)
-    
+   
     def read_invvar(self, clip=False, clipThresh=0.2, **kwargs):
         print('*** No Weight Map *** computing invvar with image and data quality mapd')
         dq=self.read_dq() 
         img,hdr=self.read_image(header=True)
         assert(dq.shape == img.shape)
         invvar=np.zeros(img.shape)
-        invvar[dq == 0]= np.power(invvar[dq == 0],-0.5)
+        invvar[dq == 0]= np.power(img[dq == 0],-0.5)
+        invvar[dq == 2]= np.power(img[dq == 2],-0.5) #SExtractor ojbect if binary(00010) = 2
         if clip:
             # Clamp near-zero (incl negative!) invvars to zero.
             # These arise due to fpack.
