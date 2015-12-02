@@ -43,7 +43,7 @@ def exposure_metadata(filenames, hdus=None, trim=None):
     allkeys = primkeys + hdrkeys + otherkeys
     #for each hdu and file, append ptf header info to vals
     vals = dict([(k,[]) for k,d in allkeys])
-    for i,fn in enumerate(filenames[:4]):
+    for i,fn in enumerate(filenames):
         print('Reading', (i+1), 'of', len(filenames), ':', fn)
         F = fitsio.FITS(fn)
         cpfn = fn
@@ -142,8 +142,8 @@ def exposure_metadata(filenames, hdus=None, trim=None):
 #
 
 if __name__ == '__main__':
-    data_dir='/project/projectdirs/desi/imaging/data/ptf/ptf_22694/gband/science'
-    files=glob.glob(os.path.join(data_dir,"*.fits"))
+    data_dir='/project/projectdirs/desi/imaging/data/ptf/cosmos/pimage'
+    files=glob.glob(os.path.join(data_dir,"*p002740*.fits"))
     T=exposure_metadata(files)
 #save table to .fits
     outfn = 'decals-ccds.fits'

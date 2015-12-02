@@ -492,6 +492,99 @@ class PtfDecals(Decals):
         print('ccd ra= ',T.ra,'ccd dec= ',T.dec) 
         return T
 
+def sed_matched_filters(bands):
+    '''
+    Determines which SED-matched filters to run based on the available
+    bands.
+
+    Returns
+    -------
+    SEDs : list of (name, sed) tuples
+    
+    '''
+    print('######## KJB sed_matched_filters ##########')
+    if len(bands) == 1:
+        return [(bands[0], (1.,))]
+
+    # single-band filters
+    SEDs = []
+    for i,band in enumerate(bands):
+        sed = np.zeros(len(bands))
+        sed[i] = 1.
+        SEDs.append((band, sed))
+
+    if len(bands) > 1:
+        flat = dict(g=1., r=1., z=1.,R=1.)
+        SEDs.append(('Flat', [flat[b] for b in bands]))
+        red = dict(g=2.5, r=1., z=0.4,R=1.)
+        SEDs.append(('Red', [red[b] for b in bands]))
+
+    return SEDs
+
+def get_rgb(imgs, bands, mnmx=None, arcsinh=None, scales=None):
+    '''
+    Given a list of images in the given bands, returns a scaled RGB
+    image.
+
+    *imgs*  a list of numpy arrays, all the same size, in nanomaggies
+    *bands* a list of strings, eg, ['g','r','z']
+    *mnmx*  = (min,max), values that will become black/white *after* scaling. Default is (-3,10)
+    *arcsinh* use nonlinear scaling as in SDSS
+    *scales*
+
+    Returns a (H,W,3) numpy array with values between 0 and 1.
+    '''
+    print('######## KJB get_rgb ##########')
+    bands = ''.join(bands)
+
+    grzscales = dict(g = (2, 0.0066),
+                      r = (1, 0.01),
+                      R = (1, 0.01),
+                      z = (0, 0.025),
+                      )
+
+    if scales is None:
+        if bands == 'grz':
+            scales = grzscales
+        elif bands == 'urz':
+            scales = dict(u = (2, 0.0066),
+                          r = (1, 0.01),
+                          z = (0, 0.025),
+                          )
+        elif bands == 'gri':
+            # scales = dict(g = (2, 0.004),
+            #               r = (1, 0.0066),
+            #               i = (0, 0.01),
+            #               )
+            scales = dict(g = (2, 0.002),
+                          r = (1, 0.004),
+                          i = (0, 0.005),
+                          )
+        else:
+            scales = grzscales
+        
+    h,w = imgs[0].shape
+    rgb = np.zeros((h,w,3), np.float32)
+    # Convert to ~ sigmas
+    for im,band in zip(imgs, bands):
+        plane,scale = scales[band]
+        rgb[:,:,plane] = (im / scale).astype(np.float32)
+
+    if mnmx is None:
+        mn,mx = -3, 10
+    else:
+        mn,mx = mnmx
+
+    if arcsinh is not None:
+        def nlmap(x):
+            return np.arcsinh(x * arcsinh) / np.sqrt(arcsinh)
+        rgb = nlmap(rgb)
+        mn = nlmap(mn)
+        mx = nlmap(mx)
+
+    rgb = (rgb - mn) / (mx - mn)
+    return np.clip(rgb, 0., 1.)
+ 
 
 def main():
     from runbrick import run_brick, get_parser, get_runbrick_kwargs

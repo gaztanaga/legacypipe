@@ -55,6 +55,9 @@ from legacypipe.common import *
 from legacypipe.utils import RunbrickError, NothingToDoError, iterwrapper
 from legacypipe.runbrick_plots import _plot_mods
 
+#KJB
+from legacypipe.runptf import get_rgb
+
 
 ## GLOBALS!  Oh my!
 nocache = True
@@ -1107,8 +1110,10 @@ def stage_srcs(coimgs=None, cons=None,
     of these blobs will be processed independently.
 
     '''
-    from legacypipe.detection import (detection_maps, sed_matched_filters,
-                                      run_sed_matched_filters)
+    from legacypipe.detection import (detection_maps, run_sed_matched_filters)
+    #KJB from legacypipe.detection import (detection_maps, sed_matched_filters,
+    #                                  run_sed_matched_filters)
+    from legacypipe.runptf import sed_matched_filters #KJB
 
     tlast = Time()
     if not no_sdss:
