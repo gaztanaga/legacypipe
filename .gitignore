@@ -52,3 +52,7 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+#ptf sextractor, psfex
+se_output
+psfex_output
