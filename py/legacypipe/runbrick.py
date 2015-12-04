@@ -4847,6 +4847,8 @@ python -u legacypipe/runbrick.py --plots --brick 2440p070 --zoom 1900 2400 450 9
 
 '''
     parser = argparse.ArgumentParser(description=de,epilog=ep)
+    parser.add_argument('--mask_dir', default='../mask-2',
+                        help='path, relative to pimage directory, of ptf bit masks with 2 subtracted')
     parser.add_argument(
         '-f', '--force-stage', dest='force', action='append', default=[],
         help="Force re-running the given stage(s) -- don't read from pickle.")

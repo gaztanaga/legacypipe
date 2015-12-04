@@ -78,8 +78,11 @@ class PtfImage(LegacySurveyImage):
     '''
     def __init__(self, decals, t):
         super(PtfImage, self).__init__(decals, t)
-        self.dqfn= os.path.join(os.path.dirname(self.imgfn),'../mask',os.path.basename(self.imgfn))
+        #bit-mask
+        self.dqfn= os.path.join(os.path.dirname(self.imgfn),'../mask-2',os.path.basename(self.imgfn))
         self.dqfn = self.dqfn.replace('_scie_', '_mask_')
+        #psfex catalogues
+        self.psffn= os.path.join(os.path.dirname(self.imgfn),'../psfex_output',os.path.basename(self.imgfn))
         #self.wtfn = self.imgfn.replace('_ooi_', '_oow_')
 
         self.name= self.imgfn
@@ -488,7 +491,7 @@ class PtfDecals(Decals):
         if 'ccdname' in T.columns():
             # "N4 " -> "N4"
             T.ccdname = np.array([s.strip() for s in T.ccdname])
-        T= T[ [np.where(T.filter == 'R')[0][0],np.where(T.filter == 'g')[0][0]] ] #1 R and 1 g band
+        #T= T[ [np.where(T.filter == 'R')[0][0],np.where(T.filter == 'g')[0][0]] ] #1 R and 1 g band
         print('ccd ra= ',T.ra,'ccd dec= ',T.dec) 
         return T
 
