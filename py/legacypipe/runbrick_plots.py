@@ -1,5 +1,6 @@
 import pylab as plt
 from common import *
+from legacypipe.runptf import get_rgb
 
 def _psf_check_plots(tims):
     # HACK -- check PSF models

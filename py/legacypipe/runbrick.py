@@ -364,12 +364,12 @@ def stage_tims(W=3600, H=3600, pixscale=0.262, brickname=None,
                 if tim.band != b:
                     continue
                 # broaden range to encompass most pixels... only req'd when sky is bad
-                lo,hi = -5.*s, 5.*s
+                #lo,hi = -5.*s, 5.*s
                 pix = tim.getImage()[tim.getInvError() > 0]
-                lo = min(lo, np.percentile(pix, 5))
-                hi = max(hi, np.percentile(pix, 95))
+                lo = np.percentile(pix, 5) #min(lo, np.percentile(pix, 5))
+                hi = np.percentile(pix, 95) #max(hi, np.percentile(pix, 95))
                 plt.hist(pix, range=(lo, hi), bins=50, histtype='step',
-                         alpha=0.5, label='%s: %.0f s' % (name, exptime))
+                         alpha=0.5, label='name: exptime')
             plt.legend()
             plt.xlabel('Pixel values')
             plt.title('Pixel distributions: %s band' % b)
@@ -2545,7 +2545,7 @@ def _one_blob(X):
         for tim in tims:
             chi = (tim.data * tim.inverr)[tim.inverr > 0]
             plt.hist(chi.ravel(), range=(-5,10), bins=100, histtype='step',
-                     color=ccmap[tim.band])
+                     color='r') #ccmap[tim.band])
         plt.xlabel('signal/noise per pixel')
         ps.savefig()
 
