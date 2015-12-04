@@ -57,7 +57,7 @@ from legacypipe.runbrick_plots import _plot_mods
 
 #KJB
 from legacypipe.runptf import get_rgb
-
+from legacypipe import ptf_sfd 
 
 ## GLOBALS!  Oh my!
 nocache = True
@@ -1046,7 +1046,8 @@ def stage_image_coadds(targetwcs=None, bands=None, tims=None, outdir=None,
         rgb = get_rgb(ims, bands, **rgbkw)
         kwa = {}
         if coadd_bw and len(bands) == 1:
-            i = 'zrg'.index(bands[0])
+            #i = 'zrg'.index(bands[0])
+            i=0 #KJB
             rgb = rgb[:,:,i]
             kwa = dict(cmap='gray')
         plt.imsave(tmpfn, rgb, origin='lower', **kwa)
@@ -1893,7 +1894,7 @@ def stage_fitblobs_finish(
     outdir=None,
     write_metrics=True,
     get_all_models=False,
-    allbands = 'ugrizY',
+    allbands = 'gR', #'ugrizY',
     **kwargs):
     '''
     This is a "glue" stage to repackage the results from the
@@ -3919,7 +3920,8 @@ def stage_coadds(bands=None, version_header=None, targetwcs=None,
         rgb = get_rgb(ims, bands, **rgbkw)
         kwa = {}
         if coadd_bw and len(bands) == 1:
-            i = 'zrg'.index(bands[0])
+            #i = 'zrg'.index(bands[0])
+            i=0 #KJB
             rgb = rgb[:,:,i]
             kwa = dict(cmap='gray')
         plt.imsave(tmpfn, rgb, origin='lower', **kwa)
@@ -4307,13 +4309,20 @@ def stage_writecat(
     trymakedirs(dirnm)
 
     print('Reading SFD maps...')
-    sfd = SFDMap()
-    filts = ['%s %s' % ('DES', f) for f in allbands]
+    sfd = ptf_sfd.SFDMap() #KJB
+    #filts = ['%s %s' % ('DES', f) for f in allbands]
+    filts= ['%s %s' % ('DES', f) for f in 'ugrizY']
     wisebands = ['WISE W1', 'WISE W2', 'WISE W3', 'WISE W4']
-    ebv,ext = sfd.extinction(filts + wisebands, T2.ra, T2.dec, get_ebv=True)
-    ext = ext.astype(np.float32)
-    decam_extinction = ext[:,:len(allbands)]
-    wise_extinction = ext[:,len(allbands):]
+    ptfbands= ['PTF g','PTF R'] #KJB
+    ebv,ext = sfd.extinction(filts + wisebands+ptfbands, T2.ra, T2.dec, get_ebv=True) #KJB
+    #print('####kwargs.keys()= ',kwargs.keys())
+    #print("kwargs['ccds']['extinct']= ",kwargs['ccds'].get('extinct')[0])
+    #print('###### WARNING: E(B-V),Dust A being loaded from header #####')
+    #ebv,ext= kwargs['ccds'].get('colortrm'),kwargs['ccds'].get('extinct') #KJB
+    #ext = ext.astype(np.float32)
+    #ebv = ebv.astype(np.float32)
+    decam_extinction = ext[:,:len(allbands)] 
+    wise_extinction = ext[:,len(allbands):] 
     T2.ebv = ebv.astype(np.float32)
     T2.decam_mw_transmission = 10.**(-decam_extinction / 2.5)
     if WISE is not None:
@@ -4419,7 +4428,6 @@ def stage_writecat(
     if write_catalog:
         T2.writeto(fn, primheader=primhdr, header=hdr, columns=cols)
         print('Wrote', fn)
-
     return dict(T2=T2)
 
 
