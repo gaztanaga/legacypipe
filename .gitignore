@@ -56,3 +56,6 @@ nosetests.xml
 #ptf sextractor, psfex
 se_output
 psfex_output
+pimage
+mask
+mask-2
