@@ -219,46 +219,47 @@ def stretch_hist_eq(img):
     return exposure.equalize_hist(img)
 
 def plot_images(imgfn,maskfn,xyc):
-	fig= plt.figure()
-	fig.set_size_inches(20.,20.)
-	grid = AxesGrid(fig, 111,  # similar to subplot(143)
-					nrows_ncols=(1, 3),
-					axes_pad=0.2,
-					label_mode="all",
-					share_all=False,
-					cbar_location="bottom",
-					cbar_mode="each",
-					cbar_size="7%",
-					cbar_pad="2%",
-					)
-	clim=[]
-	for i,fn,title in zip(range(3),[imgfn,maskfn,'junk'],\
-						  ['Image (stretched)','Mask (0=good, 1=any flag)','Inverse Variance (stretched)']):
-		if i == 2: img= read_invvar(imgfn,maskfn) 
-		else: img=fits.open(fn)[0].data
-		if i == 1:
-			img[img > 0]=1
-			print "mask min,max= ",img.min(),img.max()
-		else: img= stretch_min_max(img)
-		clim.append([img.min(),img.max()])
-		im = grid[i].imshow(img,cmap=plt.get_cmap('gray'),origin='lower',\
-							vmin=clim[i][0], vmax=clim[i][1])
-		if i == 0:
-			for c in xyc:
-				bott_left= np.array(c)-100
-				rect = Rectangle(bott_left,200,200)
-				grid[i].add_artist(rect)
-				rect.set_alpha(0.8)
-				rect.set_facecolor('none')
-				rect.set_edgecolor('b')
-		grid[i].set_title(title,fontsize='xx-large')
-		grid[i].set_xticks([])
-		grid[i].set_yticks([])
-		grid.cbar_axes[i].colorbar(im)
-		grid.cbar_axes[i].set_xticks([clim[i][0], clim[i][1]])
-	for cax in grid.cbar_axes:
-		cax.toggle_label(True)
-	plt.savefig('image_objects.png',dpi=150)    
+    fig= plt.figure()
+    fig.set_size_inches(20.,20.)
+    grid = AxesGrid(fig, 111,  # similar to subplot(143)
+                    nrows_ncols=(1, 3),
+                    axes_pad=0.2,
+                    label_mode="all",
+                    share_all=False,
+                    cbar_location="bottom",
+                    cbar_mode="each",
+                    cbar_size="7%",
+                    cbar_pad="2%",
+                    )
+    clim=[]
+    for i,fn,title in zip(range(3),[imgfn,maskfn,'junk'],\
+                          ['Image (stretched)','Mask (0=good, 1=any flag)','Inverse Variance (stretched)']):
+        if i == 2: img= read_invvar(imgfn,maskfn) 
+        else: img=fits.open(fn)[0].data
+        if i == 1:
+            img[img > 0]=1
+            print "mask min,max= ",img.min(),img.max()
+        else: img= stretch_min_max(img)
+        clim.append([img.min(),img.max()])
+        im = grid[i].imshow(img,cmap=plt.get_cmap('gray'),origin='lower',\
+                            vmin=clim[i][0], vmax=clim[i][1])
+        if i == 0:
+            for c in xyc:
+                bott_left= np.array(c)-100
+                rect = Rectangle(bott_left,200,200)
+                grid[i].add_artist(rect)
+                rect.set_alpha(0.8)
+                rect.set_facecolor('none')
+                rect.set_edgecolor('b')
+        grid[i].set_title(title,fontsize='xx-large')
+        if i != 0:
+            grid[i].set_xticks([])
+            grid[i].set_yticks([])
+        grid.cbar_axes[i].colorbar(im)
+        grid.cbar_axes[i].set_xticks([clim[i][0], clim[i][1]])
+    for cax in grid.cbar_axes:
+        cax.toggle_label(True)
+    plt.savefig('image_objects.png',dpi=150)    
     
 def plot_se(imgfn,maskfn,sefn,psfexfn):
     #image
@@ -293,8 +294,8 @@ def plot_se(imgfn,maskfn,sefn,psfexfn):
             ax.set_xticks([])
             ax.set_yticks([])
 #             print "xlim= ",xlim,"ylim= ",ylim
-            x_index=np.logical_and(a2['XWIN_IMAGE'] > xlim[0],a2['XWIN_IMAGE'] < xlim[1])
-            y_index=np.logical_and(a2['YWIN_IMAGE'] > ylim[0],a2['YWIN_IMAGE'] < ylim[1])
+            x_index=np.logical_and(a2['X_IMAGE'] > xlim[0],a2['X_IMAGE'] < xlim[1])
+            y_index=np.logical_and(a2['Y_IMAGE'] > ylim[0],a2['Y_IMAGE'] < ylim[1])
             xy=np.logical_and(x_index,y_index)
             for i in range(len(a2['X_IMAGE'][xy])):
     #             ellip= Ellipse(xy= (a2['XWIN_IMAGE'][xy][i],a2['YWIN_IMAGE'][xy][i]),\
