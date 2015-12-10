@@ -7,7 +7,7 @@ import glob
 parser = argparse.ArgumentParser(description="test")
 parser.add_argument("-img_search",action="store",help='full path + search string for ptf images')
 parser.add_argument("-configdir",action="store",help='directory with SExtractor config files')
-parser.add_argument("-savedir",action="store",help='output file name')
+parser.add_argument("-savedir",action="store",help='output dir, filename handles automatically')
 args = parser.parse_args()
 
 # grab header values...

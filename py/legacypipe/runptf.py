@@ -82,7 +82,7 @@ class PtfImage(LegacySurveyImage):
         self.dqfn= os.path.join(os.path.dirname(self.imgfn),'../mask-2',os.path.basename(self.imgfn))
         self.dqfn = self.dqfn.replace('_scie_', '_mask_')
         #psfex catalogues
-        self.psffn= os.path.join(os.path.dirname(self.imgfn),'../psfex_output',os.path.basename(self.imgfn))
+        self.psffn= os.path.join(os.path.dirname(self.imgfn),'../psfex',os.path.basename(self.imgfn))
         #self.wtfn = self.imgfn.replace('_ooi_', '_oow_')
 
         self.name= self.imgfn
@@ -193,7 +193,7 @@ class PtfImage(LegacySurveyImage):
         assert(dq.shape == img.shape)
         invvar=np.zeros(img.shape)
         invvar[dq == 0]= np.power(img[dq == 0],-0.5)
-        invvar[dq == 2]= np.power(img[dq == 2],-0.5) #SExtractor ojbect if binary(00010) = 2
+        #invvar[dq == 2]= np.power(img[dq == 2],-0.5) #mask-2 already done, bit 2^1 for SExtractor ojbects
         if clip:
             # Clamp near-zero (incl negative!) invvars to zero.
             # These arise due to fpack.

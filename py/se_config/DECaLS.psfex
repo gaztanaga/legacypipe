@@ -1,5 +1,5 @@
-# Default configuration file for PSFEx 3.17.1
-# EB 2015-09-07
+# Default configuration file for PSFEx 3.15.0
+# EB 2013-05-01
 #
  
 #-------------------------------- PSF model ----------------------------------
@@ -11,18 +11,19 @@ BASIS_SCALE     1.0             # Gauss-Laguerre beta parameter
 NEWBASIS_TYPE   NONE            # Create new basis: NONE, PCA_INDEPENDENT
                                 # or PCA_COMMON
 NEWBASIS_NUMBER 8               # Number of new basis vectors
-PSF_SAMPLING    0.0             # Sampling step in pixel units (0.0 = auto)
+PSF_SAMPLING    1.0             # Sampling step in pixel units (0.0 = auto)
 PSF_PIXELSIZE   1.0             # Effective pixel size in pixel step units
 PSF_ACCURACY    0.01            # Accuracy to expect from PSF "pixel" values
-PSF_SIZE        25,25           # Image size of the PSF model
+#for PTF
+PSF_SIZE        15,15           # Image size of the PSF model
 PSF_RECENTER    N               # Allow recentering of PSF-candidates Y/N ?
 MEF_TYPE        INDEPENDENT     # INDEPENDENT or COMMON
  
 #------------------------- Point source measurements -------------------------
  
 CENTER_KEYS     X_IMAGE,Y_IMAGE # Catalogue parameters for source pre-centering
-PHOTFLUX_KEY    FLUX_APER(1)    # Catalogue parameter for photometric norm.
-PHOTFLUXERR_KEY FLUXERR_APER(1) # Catalogue parameter for photometric error
+PHOTFLUX_KEY    FLUX_APER(4)    # Catalogue parameter for photometric norm.
+PHOTFLUXERR_KEY FLUXERR_APER(4) # Catalogue parameter for photometric error
  
 #----------------------------- PSF variability -------------------------------
  
@@ -37,8 +38,9 @@ STABILITY_TYPE  EXPOSURE        # EXPOSURE or SEQUENCE
  
 SAMPLE_AUTOSELECT  Y            # Automatically select the FWHM (Y/N) ?
 SAMPLEVAR_TYPE     SEEING       # File-to-file PSF variability: NONE or SEEING
-SAMPLE_FWHMRANGE   2.0,10.0     # Allowed FWHM range
-SAMPLE_VARIABILITY 0.2          # Allowed FWHM variability (1.0 = 100%)
+#for PTF
+SAMPLE_FWHMRANGE   1.5,7.     # Allowed FWHM range
+SAMPLE_VARIABILITY 0.20         # Allowed FWHM variability (1.0 = 100%)
 SAMPLE_MINSN       20           # Minimum S/N for a source to be used
 SAMPLE_MAXELLIP    0.3          # Maximum (A-B)/(A+B) for a source to be used
 SAMPLE_FLAGMASK    0x00fe       # Rejection mask on SExtractor FLAGS
@@ -56,39 +58,38 @@ HOMOPSF_PARAMS     2.0, 3.0     # Moffat parameters of the idealised PSF
 HOMOKERNEL_DIR                  # Where to write kernels (empty=same as input)
 HOMOKERNEL_SUFFIX  .homo.fits   # Filename extension for homogenisation kernels
 
-#----------------------------- Output catalogs -------------------------------
-
-OUTCAT_TYPE        NONE         # NONE, ASCII_HEAD, ASCII, FITS_LDAC
-OUTCAT_NAME        psfex_out.cat  # Output catalog filename
-
 #------------------------------- Check-plots ----------------------------------
  
-CHECKPLOT_DEV       PNG         # NULL, XWIN, TK, PS, PSC, XFIG, PNG,
+CHECKPLOT_DEV       NULL         # NULL, XWIN, TK, PS, PSC, XFIG, PNG,
                                 # JPEG, AQT, PDF or SVG
 CHECKPLOT_RES       0           # Check-plot resolution (0 = default)
 CHECKPLOT_ANTIALIAS Y           # Anti-aliasing using convert (Y/N) ?
-CHECKPLOT_TYPE      FWHM,ELLIPTICITY,COUNTS, COUNT_FRACTION, CHI2, RESIDUALS
+
+#CHECKPLOT_TYPE      FWHM,ELLIPTICITY,COUNTS, COUNT_FRACTION, CHI2, RESIDUALS
                                 # or NONE
-CHECKPLOT_NAME      fwhm, ellipticity, counts, countfrac, chi2, resi
+#CHECKPLOT_NAME      fwhm, ellipticity, counts, countfrac, chi2, resi
  
+CHECKPLOT_TYPE NONE
+
+CHECKIMAGE_TYPE NONE
+
 #------------------------------ Check-Images ---------------------------------
- 
-CHECKIMAGE_TYPE CHI,PROTOTYPES,SAMPLES,RESIDUALS,SNAPSHOTS
-                                # or MOFFAT,-MOFFAT,-SYMMETRICAL
-CHECKIMAGE_NAME chi.fits,proto.fits,samp.fits,resi.fits,snap.fits
-                                # Check-image filenames
-CHECKIMAGE_CUBE N               # Save check-images as datacubes (Y/N) ?
- 
+# 
+#CHECKIMAGE_TYPE SAMPLES,SNAPSHOTS_IMRES         # CHI,PROTOTYPES,SAMPLES,RESIDUALS,SNAPSHOTS
+#                                # or MOFFAT,-MOFFAT,-SYMMETRICAL
+#CHECKIMAGE_NAME samp.fits,snap_imres.fits       #chi.fits,proto.fits,samp.fits,resi.fits,snap.fits
+#                                # Check-image filenames
+#CHECKIMAGE_CUBE Y               # Save check-images as datacubes (Y/N) ?
+# 
 #----------------------------- Miscellaneous ---------------------------------
  
 PSF_DIR                         # Where to write PSFs (empty=same as input)
-PSF_SUFFIX      .psf            # Filename extension for output PSF filename
-VERBOSE_TYPE    NORMAL          # can be QUIET,NORMAL,LOG or FULL
-WRITE_XML       Y               # Write XML file (Y/N)?
+PSF_SUFFIX      .fits            # Filename extension for output PSF filename
+VERBOSE_TYPE    FULL            # can be QUIET,NORMAL,LOG or FULL
+WRITE_XML       N               # Write XML file (Y/N)?
 XML_NAME        psfex.xml       # Filename for XML output
-XSL_URL         file:///scratch/scratchdirs/kisner/software/hpcports_shared_gnu/psfex-3.17.1_d83905ab-2.0/share/psfex/psfex.xsl
+XSL_URL         file:///share/apps/usr/share/psfex/psfex.xsl
                                 # Filename for XSL style-sheet
-NTHREADS        0               # Number of simultaneous threads for
+NTHREADS        1               # Number of simultaneous threads for
                                 # the SMP version of PSFEx
                                 # 0 = automatic
- 
