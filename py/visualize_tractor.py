@@ -13,6 +13,8 @@ parser.add_argument("-imgfn",action="store",help='abs path to image file name')
 parser.add_argument("-maskfn",action="store",help='...mask-2')
 parser.add_argument("-sefn",action="store",help='...SExtractor catalogue')
 parser.add_argument("-psfexfn",action="store",help='...PSFex catalogue')
+parser.add_argument("-modelfn",action="store",help='...Tractor model')
+parser.add_argument("-tractor_imgfn",action="store",help='...Tractor model')
 args = parser.parse_args()
 
 ##PSFEX
@@ -260,8 +262,90 @@ def plot_images(imgfn,maskfn,xyc):
     for cax in grid.cbar_axes:
         cax.toggle_label(True)
     plt.savefig('image_objects.png',dpi=150)    
-    
-def plot_se(imgfn,maskfn,sefn,psfexfn):
+
+def tractor_residual(imagefn,modelfn):
+    img=fits.open(imagefn)[0].data
+    mod=fits.open(modelfn)[0].data
+    return img - mod
+
+def plot_tractor(imgfn,modelfn,name=None):
+    '''file names are to fits files'''
+    fig= plt.figure()
+    fig.set_size_inches(20.,20.)
+    grid = AxesGrid(fig, 111,  # similar to subplot(143)
+                    nrows_ncols=(1, 3),
+                    axes_pad=0.2,
+                    label_mode="all",
+                    share_all=False,
+                    cbar_location="bottom",
+                    cbar_mode="each",
+                    cbar_size="7%",
+                    cbar_pad="2%",
+                    )
+    clim=[]
+    for i,fn,title in zip(range(3),[imgfn,modelfn,'junk'],\
+                          ['Tractor Image (stretched)','Tractor Model (stretched)','Residual (Image - Model)']):
+        if i == 2: img= tractor_residual(imgfn,modelfn) 
+        else: img=fits.open(fn)[0].data
+        img= stretch_min_max(img)
+        clim.append([img.min(),img.max()])
+        im = grid[i].imshow(img,cmap=plt.get_cmap('gray'),origin='lower',\
+                            vmin=clim[i][0], vmax=clim[i][1])
+        grid[i].set_title(title,fontsize='xx-large')
+        if i != 0:
+            grid[i].set_xticks([])
+            grid[i].set_yticks([])
+        grid.cbar_axes[i].colorbar(im)
+        grid.cbar_axes[i].set_xticks([clim[i][0], clim[i][1]])
+    for cax in grid.cbar_axes:
+        cax.toggle_label(True)
+    if name != None: plt.savefig(name,dpi=150)
+    else: plt.savefig('tractor_images.png',dpi=150)    
+
+def plot_tractor_cutouts(imgfn,modelfn,xyc,wh=200):
+    #model
+    mod= stretch_min_max( fits.open(modelfn)[0].data )
+    resid= tractor_residual(imgfn,modelfn)
+    resid= stretch_min_max( resid)
+    #plot
+    fig,axes = plt.subplots(5,6)
+    fig.set_size_inches(15.,20.)
+    plt.subplots_adjust(hspace=-0.5, wspace=0)
+    se_rows,se_cols= 5,3
+    #model
+    cnt=0
+    for r,rpanel in zip(range(se_rows),range(se_rows)[::-1]):  
+        yc= xyc[cnt][1]
+        for c,cpanel in zip(range(se_cols),np.arange(se_cols)): 
+            xc= xyc[cnt][0] 
+            xlim,ylim= [xc-wh/2,xc+wh/2],[yc-wh/2,yc+wh/2]
+            ax = axes[rpanel,cpanel] #plt.subplot2grid((5, 6), (rpanel, cpanel))
+            ax.set_xlim(xlim) #CRITICAL for ellipses to appear
+            ax.set_ylim(ylim)
+            ax.imshow(mod, cmap=plt.get_cmap('gray'),origin='lower')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            cnt+=1
+    #plot PSFex
+    cnt=0
+    for rpanel in range(se_rows)[::-1]:  
+        yc= xyc[cnt][1]
+        for cpanel in np.arange(se_cols)+3: 
+            xc= xyc[cnt][0] 
+            xlim,ylim= [xc-wh/2,xc+wh/2],[yc-wh/2,yc+wh/2]
+            ax = axes[rpanel,cpanel] #plt.subplot2grid((5, 6), (rpanel, cpanel))
+            ax.set_xlim(xlim) #CRITICAL for ellipses to appear
+            ax.set_ylim(ylim)
+            ax.imshow(resid, cmap=plt.get_cmap('gray'),origin='lower')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            cnt+=1
+    #save plot
+    plt.savefig('tractor_cutouts.png',dpi=150)
+    plt.close()
+ 
+ 
+def plot_se(imgfn,maskfn,sefn,psfexfn,wh=200):
     #image
     tmp=fits.open(imgfn)
     img=tmp[0].data
@@ -286,7 +370,7 @@ def plot_se(imgfn,maskfn,sefn,psfexfn):
             xc= colstep*(c+1) 
             print "center= ",xc,yc
             xyc.append([xc,yc])#for later use
-            xlim,ylim= [xc-100,xc+100],[yc-100,yc+100]
+            xlim,ylim= [xc-wh/2,xc+wh/2],[yc-wh/2,yc+wh/2]
             ax = axes[rpanel,cpanel] #plt.subplot2grid((5, 6), (rpanel, cpanel))
             ax.set_xlim(xlim) #CRITICAL for ellipses to appear
             ax.set_ylim(ylim)
@@ -328,9 +412,14 @@ def plot_se(imgfn,maskfn,sefn,psfexfn):
     #save plot
     plt.savefig('SExtractor_objects.png',dpi=150)
     plt.close()
-    #plot img with boxes corresponding to postage stamps above
-    plot_images(imgfn,maskfn,xyc)
-    
+    #so can overplot locations on images
+    return xyc
 
+   
 # plot_img(imgfn)
-plot_se(args.imgfn,args.maskfn,args.sefn,args.psfexfn)
+#xyc= plot_se(args.imgfn,args.maskfn,args.sefn,args.psfexfn,wh=300)
+#plot_images(args.imgfn,args.maskfn,xyc)
+#plot_tractor(args.tractor_imgfn,args.modelfn,name='tractor2.png')
+plot_tractor(args.imgfn,args.modelfn,name='tractor1.png')
+#plot_tractor_cutouts(args.tractor_imgfn,args.modelfn,xyc,wh=300)
+
