@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from astropy.io import fits
 import numpy as np
-from skimage import exposure
 import matplotlib.patches as mpatches
 from mpl_toolkits.axes_grid1 import AxesGrid
 import os
@@ -139,6 +138,60 @@ class KaylanPsfex(object):
         plt.suptitle('PsfEx eigen-bases')
 
 ##image
+
+########
+## copied from skimage/exposure/exposure.py and skimage/util/dtype.py because
+## not easy to install scikit-image on NERSC computers
+def intensity_range(image, range_values='image', clip_negative=False):
+    DTYPE_RANGE = {np.bool_: (False, True),
+               np.bool8: (False, True),
+               np.uint8: (0, 255),
+               np.uint16: (0, 65535),
+               np.int8: (-128, 127),
+               np.int16: (-32768, 32767),
+               np.int64: (-2**63, 2**63 - 1),
+               np.uint64: (0, 2**64 - 1),
+               np.int32: (-2**31, 2**31 - 1),
+               np.uint32: (0, 2**32 - 1),
+               np.float32: (-1, 1),
+               np.float64: (-1, 1)}
+    if range_values == 'dtype':
+        range_values = image.dtype.type
+
+    if range_values == 'image':
+        i_min = np.min(image)
+        i_max = np.max(image)
+    elif range_values in DTYPE_RANGE:
+        i_min, i_max = DTYPE_RANGE[range_values]
+        if clip_negative:
+            i_min = 0
+    else:
+        i_min, i_max = range_values
+    return i_min, i_max
+
+def rescale_intensity(image, in_range='image', out_range='dtype'):
+    dtype = image.dtype.type
+
+    if in_range is None:
+        in_range = 'image'
+        msg = "`in_range` should not be set to None. Use {!r} instead."
+        warnings.warn(msg.format(in_range))
+
+    if out_range is None:
+        out_range = 'dtype'
+        msg = "`out_range` should not be set to None. Use {!r} instead."
+        warnings.warn(msg.format(out_range))
+
+    imin, imax = intensity_range(image, in_range)
+    omin, omax = intensity_range(image, out_range, clip_negative=(imin >= 0))
+
+    image = np.clip(image, imin, imax)
+
+    image = (image - imin) / float(imax - imin)
+    return dtype(image * (omax - omin) + omin)
+###########
+###########
+
 def read_invvar(imgfn,dqfn, clip=False, clipThresh=0.2, **kwargs):
 	img= fits.open(imgfn)[0].data
 	dq= fits.open(dqfn)[0].data 
@@ -160,7 +213,7 @@ def read_invvar(imgfn,dqfn, clip=False, clipThresh=0.2, **kwargs):
 
 def stretch_min_max(img):
     p2, p98 = np.percentile(img, (2, 98))
-    return exposure.rescale_intensity(img, in_range=(p2, p98))
+    return rescale_intensity(img, in_range=(p2, p98))
 
 def stretch_hist_eq(img):
     return exposure.equalize_hist(img)
@@ -212,7 +265,7 @@ def plot_se(imgfn,maskfn,sefn,psfexfn):
     tmp=fits.open(imgfn)
     img=tmp[0].data
     p2, p98 = np.percentile(img, (2, 98))
-    img_rescale = exposure.rescale_intensity(img, in_range=(p2, p98))
+    img_rescale = rescale_intensity(img, in_range=(p2, p98))
     #se catalogue
     a=fits.open(sefn)
     a2=a[2].data
@@ -264,7 +317,7 @@ def plot_se(imgfn,maskfn,sefn,psfexfn):
             center= xyc[cnt]
             img=psf.at(center[0],center[1])
             p2, p98 = np.percentile(img, (2, 98))
-            img_rescale = exposure.rescale_intensity(img, in_range=(p2, p98))
+            img_rescale = rescale_intensity(img, in_range=(p2, p98))
             ax = axes[rpanel,cpanel] #plt.subplot2grid((5, 6), (rpanel, cpanel))
             ax.imshow(img_rescale, cmap=plt.get_cmap('gray'),origin='lower')
             ax.set_xticks([])
