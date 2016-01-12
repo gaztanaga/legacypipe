@@ -157,9 +157,10 @@ class PtfImage(LegacySurveyImage):
         pass
        
     def read_image(self,**kwargs):
-        '''return numpy array of pixels given filename'''
+        '''return gain*pixel DN as numpy array'''
         print('Reading image from', self.imgfn, 'hdu', self.hdu)
-        return fitsio.read(self.imgfn, ext=self.hdu, header=True) 
+        img,hdr= fitsio.read(self.imgfn, ext=self.hdu, header=True) 
+        return hdr['GAIN']*img,hdr 
 
     def read_dq(self,**kwargs):
         '''return bit mask which Tractor calls "data quality" image
@@ -192,7 +193,7 @@ class PtfImage(LegacySurveyImage):
         img,hdr=self.read_image(header=True)
         assert(dq.shape == img.shape)
         invvar=np.zeros(img.shape)
-        invvar[dq == 0]= np.power(img[dq == 0],-0.5)
+        invvar[dq == 0]= np.power(img[dq == 0], -1) #img is already gain*pixel dn
         #invvar[dq == 2]= np.power(img[dq == 2],-0.5) #mask-2 already done, bit 2^1 for SExtractor ojbects
         if clip:
             # Clamp near-zero (incl negative!) invvars to zero.

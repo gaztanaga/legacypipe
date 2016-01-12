@@ -24,10 +24,15 @@ for cnt,imgfn in enumerate(imgfns):
     #get mask-2 filename
     maskfn= os.path.join(os.path.dirname(imgfn).replace('pimage','mask-2'),\
                             os.path.basename(imgfn).replace('_scie_','_mask_'))
+    #get invvar filename
+    invvarfn= os.path.join(os.path.dirname(imgfn).replace('pimage','invvar'),\
+                            os.path.basename(imgfn).replace('_scie_','_invvar_'))
     #save name
     savefn= os.path.join(args.savedir,os.path.basename(imgfn).replace('.fits','.se_cat'))
     #
     cmd = ' '.join(['sex','-c', os.path.join(args.configdir, 'DECaLS.se'),
+                    '-WEIGHT_IMAGE %s' % invvarfn, '-WEIGHT_TYPE MAP_WEIGHT',
+                    '-GAIN %f' % gain,
                     '-FLAG_IMAGE %s' % maskfn,
                     '-FLAG_TYPE OR',
                     '-SEEING_FWHM %f' % seeing,
@@ -41,7 +46,6 @@ for cnt,imgfn in enumerate(imgfns):
                     '-ANALYSIS_THRESH 1.0',
                     '-MAG_ZEROPOINT %f' % magzp,
                     '-CATALOG_NAME', savefn,
-                    '-GAIN %f' % gain,
                     imgfn])
     print(cmd)
     if os.system(cmd):
