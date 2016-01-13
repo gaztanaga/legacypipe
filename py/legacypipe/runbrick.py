@@ -369,10 +369,30 @@ def stage_tims(W=3600, H=3600, pixscale=0.262, brickname=None,
                 lo = np.percentile(pix, 5) #min(lo, np.percentile(pix, 5))
                 hi = np.percentile(pix, 95) #max(hi, np.percentile(pix, 95))
                 plt.hist(pix, range=(lo, hi), bins=50, histtype='step',
-                         alpha=0.5, label='name: exptime')
+                         alpha=0.5)
             plt.legend()
             plt.xlabel('Pixel values')
             plt.title('Pixel distributions: %s band' % b)
+            ps.savefig()
+
+            plt.clf()
+            mx = 0
+            lo,hi = -4,4
+            for tim in tims:
+                if tim.band != b:
+                    continue
+                # broaden range to encompass most pixels... only req'd when sky is bad
+                ie = tim.getInvError()
+                sn = (tim.getImage() * ie)[ie > 0]
+                n,bb,p = plt.hist(sn, range=(lo,hi), bins=50, histtype='step', alpha=0.5)
+                mx = max(mx, max(n))
+            plt.legend()
+            plt.xlabel('Pixel S/N')
+            plt.title('Pixel distributions: %s band' % b)
+            ax = plt.axis()
+            xx = np.linspace(lo, hi, 500)
+            plt.plot(xx, np.exp(-0.5 * xx**2) * mx, 'r-')
+            plt.axis(ax)
             ps.savefig()
 
     if plots:
