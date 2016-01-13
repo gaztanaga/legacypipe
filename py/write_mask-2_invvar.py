@@ -36,7 +36,7 @@ for cnt,imgfn in enumerate(imgfns):
     mask2= fitsio.read(os.path.join(args.mask_outdir,mask2fn),ext=0,header=False)
     #compute invvar and save to file
     invvar=np.zeros(img.shape)
-    invvar[mask2 == 0]= np.power(hdr['GAIN']*img[mask2 == 0], -1)
+    invvar[mask2 == 0]= hdr['GAIN']/img[mask2 == 0]
     name= os.path.basename(imgfn).replace('_scie_', '_invvar_') 
     fitsio.write(os.path.join(args.invvar_outdir,name),invvar,header=hdr)
     print('wrote %d of %d invvar: %s' % (cnt,len(imgfns),name))

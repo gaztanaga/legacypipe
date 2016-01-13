@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib.patches import Ellipse,Circle,Rectangle
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -13,8 +15,8 @@ parser.add_argument("-imgfn",action="store",help='abs path to image file name')
 parser.add_argument("-maskfn",action="store",help='...mask-2')
 parser.add_argument("-sefn",action="store",help='...SExtractor catalogue')
 parser.add_argument("-psfexfn",action="store",help='...PSFex catalogue')
-parser.add_argument("-modelfn",action="store",help='...Tractor model')
-parser.add_argument("-tractor_imgfn",action="store",help='...Tractor model')
+parser.add_argument("-modelfn",action="store",help='...Tractor model',required=False)
+parser.add_argument("-tractor_imgfn",action="store",help='...Tractor model',required=False)
 args = parser.parse_args()
 
 ##PSFEX
@@ -417,9 +419,9 @@ def plot_se(imgfn,maskfn,sefn,psfexfn,wh=200):
 
    
 # plot_img(imgfn)
-#xyc= plot_se(args.imgfn,args.maskfn,args.sefn,args.psfexfn,wh=300)
+xyc= plot_se(args.imgfn,args.maskfn,args.sefn,args.psfexfn,wh=300)
 #plot_images(args.imgfn,args.maskfn,xyc)
 #plot_tractor(args.tractor_imgfn,args.modelfn,name='tractor2.png')
-plot_tractor(args.imgfn,args.modelfn,name='tractor1.png')
+#plot_tractor(args.imgfn,args.modelfn,name='tractor1.png')
 #plot_tractor_cutouts(args.tractor_imgfn,args.modelfn,xyc,wh=300)
 
