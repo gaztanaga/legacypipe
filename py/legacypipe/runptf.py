@@ -460,7 +460,10 @@ class PtfDecals(Decals):
     def get_zeropoint_for(self,tractor_image):
         print('WARNING: zeropoints from header of ',tractor_image.imgfn)
         hdr=fitsio.read_header(tractor_image.imgfn)
-        return hdr['IMAGEZPT']
+        zpt = hdr['IMAGEZPT']
+        exptime = hdr['EXPTIME']
+        zpt += 2.5 * np.log10(exptime)
+        return zpt
     
     #def ccds_touching_wcs(self, wcs, **kwargs):
     #    '''PTF testing, continue even if no overlap with DECaLS bricks
