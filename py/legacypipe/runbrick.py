@@ -547,10 +547,11 @@ def _coadds(tims, bands, targetwcs,
                 dq = tim.dq[Yi,Xi]
                 # include BLEED, SATUR, INTERP pixels if no other pixels exists
                 # (do this by eliminating all other CP flags)
-                badbits = 0
-                for bitname in ['badpix', 'cr', 'trans', 'edge', 'edge2']:
-                    badbits |= CP_DQ_BITS[bitname]
-                goodpix = ((dq & badbits) == 0)
+                #badbits = 0
+                #for bitname in ['badpix', 'cr', 'trans', 'edge', 'edge2']:
+                #    badbits |= CP_DQ_BITS[bitname]
+                #goodpix = ((dq & badbits) == 0)
+                goodpix = (dq == 0) #KJB PTF data, only fill in image data where bitmask = 0
 
                 coimg[Yo,Xo] += goodpix * im
                 con  [Yo,Xo] += goodpix
