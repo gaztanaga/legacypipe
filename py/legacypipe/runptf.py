@@ -15,59 +15,58 @@ from tractor.tractortime import TAITime
 Code specific to images from the (intermediate) Palomar Transient Factory (iPTF/PTF), bands = g,R.
 11 CCDs and 1.2m telescope at Palomar Observatory.
 '''
+def read_image(imgfn,hdu):
+    '''return gain*pixel DN as numpy array'''
+    print('Reading image from', imgfn, 'hdu', hdu)
+    img,hdr= fitsio.read(imgfn, ext=hdu, header=True) 
+    return img,hdr 
 
-#### test code
-class TestCode(object):
-    def __init__(self):
-        pass
+def read_dq(dqfn,hdu):
+    '''return bit mask which Tractor calls "data quality" image
+    PTF DMASK BIT DEFINITIONS
+    BIT00   =                    0 / AIRCRAFT/SATELLITE TRACK
+    BIT01   =                    1 / OBJECT (detected by SExtractor)
+    BIT02   =                    2 / HIGH DARK-CURRENT
+    BIT03   =                    3 / RESERVED FOR FUTURE USE
+    BIT04   =                    4 / NOISY
+    BIT05   =                    5 / GHOST
+    BIT06   =                    6 / CCD BLEED
+    BIT07   =                    7 / RAD HIT
+    BIT08   =                    8 / SATURATED
+    BIT09   =                    9 / DEAD/BAD
+    BIT10   =                   10 / NAN (not a number)
+    BIT11   =                   11 / DIRTY (10-sigma below coarse local median)
+    BIT12   =                   12 / HALO
+    BIT13   =                   13 / RESERVED FOR FUTURE USE
+    BIT14   =                   14 / RESERVED FOR FUTURE USE
+    BIT15   =                   15 / RESERVED FOR FUTURE USE
+    INFOBITS=                    0 / Database infobits (2^2 and 2^3 excluded)
+    '''
+    print('Reading data quality image from', dqfn, 'hdu', hdu)
+    dq= fitsio.read(dqfn, ext=hdu, header=False)
+    return dq.astype(np.int16)-2 #pixels flagged as SEXtractor objects == 2 so are good
 
-    def read_image(self,imgfn,**kwargs):
-        '''return numpy array of pixels given filename'''
-        return fitsio.read(imgfn, ext=0, header=True) 
+def read_invvar(imgfn,dqfn,hdu, clip=False):
+    img,hdr= read_image(imgfn,hdu)
+    dq= read_dq(dqfn,hdu)
+    assert(dq.shape == img.shape)
+    invvar=np.zeros(img.shape)
+    invvar[dq == 0]= hdr['GAIN']/img[dq == 0] #mask-2 already done, bit 2^1 for SExtractor ojbects
+    if clip:
+        # Clamp near-zero (incl negative!) invvars to zero.
+        # These arise due to fpack.
+        if clipThresh > 0.:
+            med = np.median(invvar[invvar > 0])
+            thresh = clipThresh * med
+        else:
+            thresh = 0.
+        invvar[invvar < thresh] = 0
+    return invvar
 
-    def read_dq(self,dqfn,**kwargs):
-        '''return bit mask which Tractor calls "data quality" image
-        PTF DMASK BIT DEFINITIONS
-        BIT00   =                    0 / AIRCRAFT/SATELLITE TRACK
-        BIT01   =                    1 / OBJECT (detected by SExtractor)
-        BIT02   =                    2 / HIGH DARK-CURRENT
-        BIT03   =                    3 / RESERVED FOR FUTURE USE
-        BIT04   =                    4 / NOISY
-        BIT05   =                    5 / GHOST
-        BIT06   =                    6 / CCD BLEED
-        BIT07   =                    7 / RAD HIT
-        BIT08   =                    8 / SATURATED
-        BIT09   =                    9 / DEAD/BAD
-        BIT10   =                   10 / NAN (not a number)
-        BIT11   =                   11 / DIRTY (10-sigma below coarse local median)
-        BIT12   =                   12 / HALO
-        BIT13   =                   13 / RESERVED FOR FUTURE USE
-        BIT14   =                   14 / RESERVED FOR FUTURE USE
-        BIT15   =                   15 / RESERVED FOR FUTURE USE
-        INFOBITS=                    0 / Database infobits (2^2 and 2^3 excluded)
-        '''
-        dq= fitsio.read(dqfn, ext=0, header=False)
-        return dq.astype(np.int16)
-        
-    def read_invvar(self,imgfn,dqfn, clip=False, clipThresh=0.2, **kwargs):
-        print('*** No Weight Map *** computing invvar with image and data quality mapd')
-        dq=read_dq(dqfn) 
-        img,hdr=read_image(imgfn,header=True)
-        assert(dq.shape == img.shape)
-        invvar=np.zeros(img.shape)
-        invvar[dq == 0]= np.power(img[dq == 0],-0.5)
-        invvar[dq == 2]= np.power(img[dq == 2],-0.5) #SExtractor ojbect if binary(00010) = 2
-        if clip:
-            # Clamp near-zero (incl negative!) invvars to zero.
-            # These arise due to fpack.
-            if clipThresh > 0.:
-                med = np.median(invvar[invvar > 0])
-                thresh = clipThresh * med
-            else:
-                thresh = 0.
-            invvar[invvar < thresh] = 0
-        return invvar
-####
+def ptf_zeropoint(imgfn):
+    print('WARNING: zeropoints from header of ',imgfn)
+    hdr=fitsio.read_header(imgfn)
+    return hdr['IMAGEZPT'] + 2.5 * np.log10(hdr['EXPTIME'])
 
 class PtfImage(LegacySurveyImage):
     '''
@@ -79,7 +78,7 @@ class PtfImage(LegacySurveyImage):
     def __init__(self, decals, t):
         super(PtfImage, self).__init__(decals, t)
         #bit-mask
-        self.dqfn= os.path.join(os.path.dirname(self.imgfn),'../mask-2',os.path.basename(self.imgfn))
+        self.dqfn= os.path.join(os.path.dirname(self.imgfn),'../mask',os.path.basename(self.imgfn))
         self.dqfn = self.dqfn.replace('_scie_', '_mask_')
         #psfex catalogues
         self.psffn= os.path.join(os.path.dirname(self.imgfn),'../psfex',os.path.basename(self.imgfn))
@@ -157,55 +156,15 @@ class PtfImage(LegacySurveyImage):
         pass
        
     def read_image(self,**kwargs):
-        '''return gain*pixel DN as numpy array'''
-        print('Reading image from', self.imgfn, 'hdu', self.hdu)
-        img,hdr= fitsio.read(self.imgfn, ext=self.hdu, header=True) 
-        return img,hdr 
+        '''returns tuple of img,hdr'''
+        return read_image(self.imgfn,self.hdu) 
 
     def read_dq(self,**kwargs):
-        '''return bit mask which Tractor calls "data quality" image
-        PTF DMASK BIT DEFINITIONS
-        BIT00   =                    0 / AIRCRAFT/SATELLITE TRACK
-        BIT01   =                    1 / OBJECT (detected by SExtractor)
-        BIT02   =                    2 / HIGH DARK-CURRENT
-        BIT03   =                    3 / RESERVED FOR FUTURE USE
-        BIT04   =                    4 / NOISY
-        BIT05   =                    5 / GHOST
-        BIT06   =                    6 / CCD BLEED
-        BIT07   =                    7 / RAD HIT
-        BIT08   =                    8 / SATURATED
-        BIT09   =                    9 / DEAD/BAD
-        BIT10   =                   10 / NAN (not a number)
-        BIT11   =                   11 / DIRTY (10-sigma below coarse local median)
-        BIT12   =                   12 / HALO
-        BIT13   =                   13 / RESERVED FOR FUTURE USE
-        BIT14   =                   14 / RESERVED FOR FUTURE USE
-        BIT15   =                   15 / RESERVED FOR FUTURE USE
-        INFOBITS=                    0 / Database infobits (2^2 and 2^3 excluded)
-        '''
-        print('Reading data quality image from', self.dqfn, 'hdu', self.hdu)
-        dq= fitsio.read(self.dqfn, ext=self.hdu, header=False)
-        return dq.astype(np.int16)
-   
-    def read_invvar(self, clip=False, clipThresh=0.2, **kwargs):
-        print('*** No Weight Map *** computing invvar with image and data quality mapd')
-        dq=self.read_dq() 
-        img,hdr=self.read_image(header=True)
-        assert(dq.shape == img.shape)
-        invvar=np.zeros(img.shape)
-        invvar[dq == 0]= hdr['GAIN']/img[dq == 0] #img is already gain*pixel dn
-        #invvar[dq == 2]= np.power(img[dq == 2],-0.5) #mask-2 already done, bit 2^1 for SExtractor ojbects
-        if clip:
-            # Clamp near-zero (incl negative!) invvars to zero.
-            # These arise due to fpack.
-            if clipThresh > 0.:
-                med = np.median(invvar[invvar > 0])
-                thresh = clipThresh * med
-            else:
-                thresh = 0.
-            invvar[invvar < thresh] = 0
-        return invvar
+        return read_dq(self.dqfn,self.hdu)
 
+    def read_invvar(self, clip=False, clipThresh=0.2, **kwargs):
+        return read_invvar(self.imgfn,self.dqfn,self.hdu)
+    
     def read_sky_model(self, **kwargs):
         print('Constant sky model, median of ', self.imgfn)
         img,hdr = self.read_image(header=True)
@@ -458,13 +417,8 @@ class PtfDecals(Decals):
         self.image_typemap.update({'ptf' : PtfImage})
 
     def get_zeropoint_for(self,tractor_image):
-        print('WARNING: zeropoints from header of ',tractor_image.imgfn)
-        hdr=fitsio.read_header(tractor_image.imgfn)
-        zpt = hdr['IMAGEZPT']
-        exptime = hdr['EXPTIME']
-        zpt += 2.5 * np.log10(exptime)
-        return zpt
-    
+        return ptf_zeropoint(tractor_image.imgfn)
+   
     #def ccds_touching_wcs(self, wcs, **kwargs):
     #    '''PTF testing, continue even if no overlap with DECaLS bricks
     #    '''
