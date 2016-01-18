@@ -4,7 +4,7 @@ import fitsio
 import argparse
 import glob
 
-from .runptf import read_image,read_dq,read_invvar,ptf_zeropoint
+from legacypipe.runptf import read_image,read_dq,read_invvar,ptf_zeropoint
 
 parser = argparse.ArgumentParser(description="test")
 parser.add_argument("-img_search",action="store",help='full path + search string for ptf images')
