@@ -11,10 +11,12 @@ from astrometry.util.fits import fits_table
 from astrometry.util.util import Tan, Sip, anwcs_t
 from tractor.tractortime import TAITime
 
+
 '''
 Code specific to images from the (intermediate) Palomar Transient Factory (iPTF/PTF), bands = g,R.
 11 CCDs and 1.2m telescope at Palomar Observatory.
 '''
+
 def read_image(imgfn,hdu):
     '''return gain*pixel DN as numpy array'''
     print('Reading image from', imgfn, 'hdu', hdu)
@@ -43,8 +45,9 @@ def read_dq(dqfn,hdu):
     INFOBITS=                    0 / Database infobits (2^2 and 2^3 excluded)
     '''
     print('Reading data quality image from', dqfn, 'hdu', hdu)
-    dq= fitsio.read(dqfn, ext=hdu, header=False)
-    return dq.astype(np.int16)-2 #pixels flagged as SEXtractor objects == 2 so are good
+    mask= fitsio.read(dqfn, ext=hdu, header=False)
+    mask[mask > 0]= mask[mask > 0]-2 #pixels flagged as SEXtractor objects == 2 so are good
+    return mask.astype(np.int16) 
 
 def read_invvar(imgfn,dqfn,hdu, clip=False):
     img,hdr= read_image(imgfn,hdu)
@@ -67,6 +70,8 @@ def ptf_zeropoint(imgfn):
     print('WARNING: zeropoints from header of ',imgfn)
     hdr=fitsio.read_header(imgfn)
     return hdr['IMAGEZPT'] + 2.5 * np.log10(hdr['EXPTIME'])
+
+
 
 class PtfImage(LegacySurveyImage):
     '''
@@ -342,6 +347,8 @@ class PtfImage(LegacySurveyImage):
         if subsky:
             ##
             imgmed = np.median(img[invvar>0])
+            print('#####SUBSKY!!! , saving invvar to .fits')
+            fitsio.write('./invvar_new.fits', invvar)
             if np.abs(imgmed) > sig1:
                 print('WARNING: image median', imgmed, 'is more than 1 sigma away from zero!')
                 # Boom!
