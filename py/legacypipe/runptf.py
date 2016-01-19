@@ -86,7 +86,7 @@ class PtfImage(LegacySurveyImage):
         self.dqfn= os.path.join(os.path.dirname(self.imgfn),'../mask',os.path.basename(self.imgfn))
         self.dqfn = self.dqfn.replace('_scie_', '_mask_')
         #psfex catalogues
-        self.psffn= os.path.join(os.path.dirname(self.imgfn),'../psfex_script',os.path.basename(self.imgfn))
+        self.psffn= os.path.join(os.path.dirname(self.imgfn),'../psfex',os.path.basename(self.imgfn))
         #self.wtfn = self.imgfn.replace('_ooi_', '_oow_')
 
         self.name= self.imgfn

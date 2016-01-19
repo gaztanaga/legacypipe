@@ -1067,8 +1067,10 @@ def stage_image_coadds(targetwcs=None, bands=None, tims=None, outdir=None,
         rgb = get_rgb(ims, bands, **rgbkw)
         kwa = {}
         if coadd_bw and len(bands) == 1:
-            #i = 'zrg'.index(bands[0])
-            i=1 #KJB
+            if bands[0] == 'R': i=1
+            elif bands[0] == 'g': i=2
+            else: i=0
+            print('i= ',i,'bands= ',bands)
             rgb = rgb[:,:,i]
             kwa = dict(cmap='gray')
         plt.imsave(tmpfn, rgb, origin='lower', **kwa)
@@ -3941,8 +3943,10 @@ def stage_coadds(bands=None, version_header=None, targetwcs=None,
         rgb = get_rgb(ims, bands, **rgbkw)
         kwa = {}
         if coadd_bw and len(bands) == 1:
-            #i = 'zrg'.index(bands[0])
-            i=1 #KJB
+            if bands[0] == 'R': i=1
+            elif bands[0] == 'g': i=2
+            else: i=0
+            print('i= ',i,'bands= ',bands)
             rgb = rgb[:,:,i]
             kwa = dict(cmap='gray')
         plt.imsave(tmpfn, rgb, origin='lower', **kwa)
