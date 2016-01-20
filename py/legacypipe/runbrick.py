@@ -1002,6 +1002,7 @@ def stage_image_coadds(targetwcs=None, bands=None, tims=None, outdir=None,
     if outdir is None:
         outdir = '.'
     basedir = os.path.join(outdir, 'coadd', brickname[:3], brickname)
+    print('###makding dir: ',basedir,"brickname= ",brickname)
     trymakedirs(basedir)
 
     C = _coadds(tims, bands, targetwcs,

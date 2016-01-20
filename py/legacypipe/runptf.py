@@ -574,6 +574,7 @@ def main():
     kwargs['decals'] = decals
     
     kwargs['bands'] = 'gR'
+    if kwargs['forceAll']: kwargs['writePickles']= False
 
     # runbrick...
     print("before call run_brick")
