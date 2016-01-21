@@ -347,8 +347,6 @@ class PtfImage(LegacySurveyImage):
         if subsky:
             ##
             imgmed = np.median(img[invvar>0])
-            print('#####SUBSKY!!! , saving invvar to .fits')
-            fitsio.write('./invvar_new.fits', invvar)
             if np.abs(imgmed) > sig1:
                 print('WARNING: image median', imgmed, 'is more than 1 sigma away from zero!')
                 # Boom!

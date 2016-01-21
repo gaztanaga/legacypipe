@@ -3008,8 +3008,10 @@ def _one_blob(X):
                     value.append((propid == DECALS_PROPID) * 1e12 +
                                  tim.detiv1 * h*w)
 
+                #KJB added R
                 t1,t2,t3 = dict(g=(24.0, 23.7, 23.4),
                                 r=(23.4, 23.1, 22.8),
+                                R=(23.4, 23.1, 22.8),
                                 z=(22.5, 22.2, 21.9))[band]
                 Nsigma = 5.
                 sig = NanoMaggies.magToNanomaggies(t1) / Nsigma
