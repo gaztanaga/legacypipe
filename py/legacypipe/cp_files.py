@@ -13,7 +13,7 @@ parser.add_argument("-outdir",action="store",help='directory to make pimage/ and
 args = parser.parse_args()
 
 for mydir in ['pimage','mask']:
-    if not os.path.exists(mydir): os.makedirs(os.path.join(args.outdir,mydir))
+    if not os.path.exists(os.path.join(args.outdir,mydir)): os.makedirs(os.path.join(args.outdir,mydir))
 
 search_str= '*_f0%d_*.fits' % 2
 if args.band == 'g': search_str= '*_f0%d_*.fits' % 1

@@ -11,7 +11,8 @@ from astrometry.util.util import Tan, Sip, anwcs_t
 from legacypipe.runptf import read_image,read_dq,read_invvar,ptf_zeropoint
 
 parser = argparse.ArgumentParser(description="test")
-parser.add_argument("-img_search",action="store",help='full path + search string for ptf images')
+parser.add_argument("-pimage_dir",action="store",help='full path to pimage/')
+parser.add_argument("-start_stop",nargs=2,type=int,action="store",help='start and stop index, no 0th index, so if 100 image files then [1,100] does all of them, [2,5] does the the 2nd through the 5th, ccd.fits table made for all fits files BUT SExtractor/PSFex only run on index [start,stop] of that fits file list')
 parser.add_argument("-configdir",action="store",help='directory with SExtractor config files')
 parser.add_argument("-legacypipe_dir",action="store",help='legacypipe-dir contains decals-bricks.fits which will be copied over')
 parser.add_argument("-outdir",action="store",help='directory to make decals_dir,se,psfex directories in')
@@ -143,22 +144,26 @@ for dn in ['decals_dir','se','psfex']: make_dir(os.path.join(args.outdir,dn))
 #decals-bricks.fits
 cmd= ' '.join(['cp',os.path.join(args.legacypipe_dir,'decals-bricks.fits'),os.path.join(args.outdir,'decals_dir/')])
 if os.system(cmd): raise ValueError
-#ccd.fits table
-imgfns=glob.glob(args.img_search)
-print('found %d files' % len(imgfns))
+#ccd.fits table if not already there
+imgfns=np.sort( glob.glob(os.path.join(args.pimage_dir,'*.fits')) ) #ccd table of all fits files
 if len(imgfns) == 0: raise ValueError
-T=ptf_exposure_metadata(imgfns)
-T.writeto(os.path.join(args.outdir,'decals_dir/','decals-ccds.fits'))
-print('Wrote ccd fits table, now SExtractor + PSFex')
-home=os.getcwd()
-os.chdir(os.path.join(args.outdir,'decals_dir/'))
-cmd= ' '.join(['ln','-s',os.path.join(os.getcwd(),'../pimage'),'images'])
-if os.system(cmd): raise ValueError
-os.chdir(home)
-print('made soft links')
+for cnt,fn in enumerate(imgfns): print cnt+1,fn  #matches [start,stop] numbering
+ccd_fname= os.path.join(args.outdir,'decals_dir/','decals-ccds.fits')
+if not os.path.exists(ccd_fname): 
+    T=ptf_exposure_metadata(imgfns)
+    T.writeto(ccd_fname)
+    print('Wrote ccd fits table, now SExtractor + PSFex')
+    home=os.getcwd()
+    os.chdir(os.path.join(args.outdir,'decals_dir/'))
+    cmd= ' '.join(['ln','-s',os.path.join(os.getcwd(),'../pimage'),'images'])
+    if os.system(cmd): raise ValueError
+    os.chdir(home)
+    print('made soft links')
 #SExtractor + PSFex
 make_dir('junk') #need temp dir for mask-2 and invvar map
-for cnt,imgfn in enumerate(imgfns):
+#[start,stop] files only
+subset= imgfns[args.start_stop[0]-1:args.start_stop[1]]
+for cnt,imgfn in enumerate(subset):
     print('SExtractor,PSFex on %d of %d images' % (cnt,len(imgfns)))
     #SExtractor
     hdu=0
@@ -201,7 +206,9 @@ for cnt,imgfn in enumerate(imgfns):
                     '-PSF_DIR',os.path.join(args.outdir,'psfex/')])
     if os.system(cmd):
         raise RuntimeError('Command failed: ' + cmd)                   
-print('SExtractor,PSFex finished, removing junk/')
-for fn in glob.glob('junk/*'): os.remove(fn)
-os.rmdir('junk')
+print('SExtractor,PSFex finished, remove invvar,mask files written to junk/')
+for fn in subset: 
+    os.remove(os.path.join('junk/',os.path.basename(fn).replace('_scie_','_mask_')))
+    os.remove(os.path.join('junk/',os.path.basename(fn).replace('_scie_','_invvar_')))
+#os.rmdir('junk')
 print('done')
