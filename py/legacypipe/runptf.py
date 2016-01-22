@@ -573,6 +573,7 @@ def main():
     
     kwargs['bands'] = 'gR'
     if kwargs['forceAll']: kwargs['writePickles']= False
+    else: kwargs['writePickles']= True
 
     # runbrick...
     print("before call run_brick")

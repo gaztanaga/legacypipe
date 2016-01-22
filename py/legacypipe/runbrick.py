@@ -3286,6 +3286,7 @@ def _one_blob(X):
             newsrc.freezeAllBut('brightness')
             allderivs = modtractor.getDerivs()
             ivs = np.zeros(len(bands), np.float32)
+            print('KJB: len(bands),bands= ',len(bands),bands,'i, name= ',i,name,'ivs.shape, ivs= ',ivs.shape,ivs,'B.all_model_fluxivs.shape,B.all_model_fluxivs= ',B.all_model_fluxivs.shape,B.all_model_fluxivs)
             B.all_model_fluxivs[i][name] = ivs
             for iparam,derivs in enumerate(allderivs):
                 chisq = 0
