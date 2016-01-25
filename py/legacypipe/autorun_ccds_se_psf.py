@@ -11,7 +11,7 @@ from astrometry.util.util import Tan, Sip, anwcs_t
 from legacypipe.runptf import read_image,read_dq,read_invvar,ptf_zeropoint
 
 parser = argparse.ArgumentParser(description="test")
-parser.add_argument("-pimage_dir",action="store",help='full path to pimage/')
+parser.add_argument("-images_dir",action="store",help='full path to pimage/')
 parser.add_argument("-start_stop",nargs=2,type=int,action="store",help='start and stop index, no 0th index, so if 100 image files then [1,100] does all of them, [2,5] does the the 2nd through the 5th, ccd.fits table made for all fits files BUT SExtractor/PSFex only run on index [start,stop] of that fits file list')
 parser.add_argument("-configdir",action="store",help='directory with SExtractor config files')
 parser.add_argument("-legacypipe_dir",action="store",help='legacypipe-dir contains decals-bricks.fits which will be copied over')
@@ -139,13 +139,21 @@ def ptf_exposure_metadata(filenames, hdus=None, trim=None):
 
 
 
-#make directories to store output
-for dn in ['decals_dir','se','psfex']: make_dir(os.path.join(args.outdir,dn))
+#make decals_dir with subdirectories calib/se_config, calib/se, calib/psfex
+calib_dir= 'decals_dir/calib/ptf/'
+for dn in ['decals_dir',calib_dir+'se_config',calib_dir+'se',calib_dir+'psfex']: make_dir(os.path.join(args.outdir,dn))
+#soft link to images/
+home=os.getcwd()
+os.chdir(os.path.join(args.outdir,'decals_dir/'))
+cmd= ' '.join(['ln','-s',os.path.join(os.getcwd(),'../images'),'images'])
+if os.system(cmd): raise ValueError
+os.chdir(home)
+print('made soft links')
 #decals-bricks.fits
 cmd= ' '.join(['cp',os.path.join(args.legacypipe_dir,'decals-bricks.fits'),os.path.join(args.outdir,'decals_dir/')])
 if os.system(cmd): raise ValueError
 #ccd.fits table if not already there
-imgfns=np.sort( glob.glob(os.path.join(args.pimage_dir,'*.fits')) ) #ccd table of all fits files
+imgfns=np.sort( glob.glob(os.path.join(args.images_dir,'*_scie_*.fits')) ) #ccd table of all fits files
 if len(imgfns) == 0: raise ValueError
 for cnt,fn in enumerate(imgfns): print cnt+1,fn  #matches [start,stop] numbering
 ccd_fname= os.path.join(args.outdir,'decals_dir/','decals-ccds.fits')
@@ -153,12 +161,6 @@ if not os.path.exists(ccd_fname):
     T=ptf_exposure_metadata(imgfns)
     T.writeto(ccd_fname)
     print('Wrote ccd fits table, now SExtractor + PSFex')
-    home=os.getcwd()
-    os.chdir(os.path.join(args.outdir,'decals_dir/'))
-    cmd= ' '.join(['ln','-s',os.path.join(os.getcwd(),'../pimage'),'images'])
-    if os.system(cmd): raise ValueError
-    os.chdir(home)
-    print('made soft links')
 #SExtractor + PSFex
 make_dir('junk') #need temp dir for mask-2 and invvar map
 #[start,stop] files only
@@ -167,12 +169,12 @@ for cnt,imgfn in enumerate(subset):
     print('SExtractor,PSFex on %d of %d images' % (cnt,len(imgfns)))
     #SExtractor
     hdu=0
-    maskfn= os.path.join(os.path.dirname(imgfn).replace('pimage','mask'),\
-                            os.path.basename(imgfn).replace('_scie_','_mask_'))
+    maskfn= imgfn.replace('_scie_','_mask_')
+    print('imgfn= ',imgfn)
     invvar= read_invvar(imgfn,maskfn,hdu) #note, all post processing on image,mask done in read_invvar
     mask= read_dq(maskfn,hdu)
     maskfn= os.path.join('junk',os.path.basename(maskfn))
-    invvarfn= os.path.join('junk',os.path.basename(imgfn).replace('_scie_','_invvar_'))
+    invvarfn= maskfn.replace('_mask_','_invvar_')
     fitsio.write(maskfn, mask)
     fitsio.write(invvarfn, invvar)
     print('wrote mask-2 to %s, invvar to %s' % (maskfn,invvarfn))
@@ -181,7 +183,7 @@ for cnt,imgfn in enumerate(subset):
     hdr=fitsio.read_header(imgfn,ext=hdu)
     seeing = hdr['PIXSCALE'] * hdr['MEDFWHM']
     gain= hdr['GAIN']
-    sefn= os.path.join(args.outdir,'se/',os.path.basename(imgfn).replace('.fits','.se_cat'))
+    sefn= os.path.join(args.outdir,calib_dir,'se/',os.path.basename(imgfn).replace('.fits','.se_cat'))
     cmd = ' '.join(['sex','-c', os.path.join(args.configdir, 'DECaLS.se'),
                     '-WEIGHT_IMAGE %s' % invvarfn, '-WEIGHT_TYPE MAP_WEIGHT',
                     '-GAIN %f' % gain,
@@ -203,12 +205,11 @@ for cnt,imgfn in enumerate(subset):
         raise RuntimeError('Command failed: ' + cmd)
     #do PSFex
     cmd= ' '.join(['psfex',sefn,'-c', os.path.join(args.configdir,'DECaLS.psfex'),
-                    '-PSF_DIR',os.path.join(args.outdir,'psfex/')])
+                    '-PSF_DIR',os.path.join(args.outdir,calib_dir,'psfex/')])
     if os.system(cmd):
         raise RuntimeError('Command failed: ' + cmd)                   
+    #delete temporary mask-2 and invvar
+    #os.remove(maskfn)
+    #os.remove(invvarfn)
 print('SExtractor,PSFex finished, remove invvar,mask files written to junk/')
-for fn in subset: 
-    os.remove(os.path.join('junk/',os.path.basename(fn).replace('_scie_','_mask_')))
-    os.remove(os.path.join('junk/',os.path.basename(fn).replace('_scie_','_invvar_')))
-#os.rmdir('junk')
 print('done')

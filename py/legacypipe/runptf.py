@@ -17,6 +17,8 @@ Code specific to images from the (intermediate) Palomar Transient Factory (iPTF/
 11 CCDs and 1.2m telescope at Palomar Observatory.
 '''
 
+
+##key functions##
 def read_image(imgfn,hdu):
     '''return gain*pixel DN as numpy array'''
     print('Reading image from', imgfn, 'hdu', hdu)
@@ -83,10 +85,11 @@ class PtfImage(LegacySurveyImage):
     def __init__(self, decals, t):
         super(PtfImage, self).__init__(decals, t)
         #bit-mask
-        self.dqfn= os.path.join(os.path.dirname(self.imgfn),'../mask',os.path.basename(self.imgfn))
-        self.dqfn = self.dqfn.replace('_scie_', '_mask_')
+        self.dqfn = self.imgfn.replace('_scie_', '_mask_')
         #psfex catalogues
-        self.psffn= os.path.join(os.path.dirname(self.imgfn),'../psfex',os.path.basename(self.imgfn))
+        calibdir = os.path.join(self.decals.get_calib_dir(), self.camera)
+        self.psffn= os.path.join(calibdir,'psfex/',os.path.basename(self.imgfn))
+        print('####### self.imgfn,dqfn,calibdir,psffn= ',self.imgfn,self.dqfn,calibdir,self.psffn)
         #self.wtfn = self.imgfn.replace('_ooi_', '_oow_')
 
         self.name= self.imgfn
