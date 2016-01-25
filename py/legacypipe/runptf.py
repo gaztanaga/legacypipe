@@ -84,6 +84,9 @@ class PtfImage(LegacySurveyImage):
     '''
     def __init__(self, decals, t):
         super(PtfImage, self).__init__(decals, t)
+
+        print("--------pixscale= ",self.pixscale)
+        print("--------changing pixscale to ",1.01)
         #bit-mask
         self.dqfn = self.imgfn.replace('_scie_', '_mask_')
         #psfex catalogues
@@ -575,12 +578,12 @@ def main():
     kwargs['decals'] = decals
     
     kwargs['bands'] = 'gR'
+    kwargs['pixscale'] = 1.01
     if kwargs['forceAll']: kwargs['writePickles']= False
     else: kwargs['writePickles']= True
 
     # runbrick...
     print("before call run_brick")
-    print("pixscale= ",opt.pixscale)
     run_brick(opt.brick, **kwargs)
     return 0
     

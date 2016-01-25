@@ -4338,6 +4338,8 @@ def stage_writecat(
     trymakedirs(dirnm)
 
     print('Reading SFD maps...')
+    print('--------- bands= ',bands,'yes below if bands==gR')
+    if bands == 'gR': print('--------- YES ---------')
     sfd = ptf_sfd.SFDMap() #KJB
     #filts = ['%s %s' % ('DES', f) for f in allbands]
     filts= ['%s %s' % ('DES', f) for f in 'ugrizY']

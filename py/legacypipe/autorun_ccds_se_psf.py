@@ -145,8 +145,9 @@ for dn in ['decals_dir',calib_dir+'se_config',calib_dir+'se',calib_dir+'psfex']:
 #soft link to images/
 home=os.getcwd()
 os.chdir(os.path.join(args.outdir,'decals_dir/'))
-cmd= ' '.join(['ln','-s',os.path.join(os.getcwd(),'../images'),'images'])
-if os.system(cmd): raise ValueError
+if not os.path.exists('images'):
+    cmd= ' '.join(['ln','-s',os.path.join(os.getcwd(),'../images'),'images'])
+    if os.system(cmd): raise ValueError
 os.chdir(home)
 print('made soft links')
 #decals-bricks.fits
@@ -166,7 +167,7 @@ make_dir('junk') #need temp dir for mask-2 and invvar map
 #[start,stop] files only
 subset= imgfns[args.start_stop[0]-1:args.start_stop[1]]
 for cnt,imgfn in enumerate(subset):
-    print('SExtractor,PSFex on %d of %d images' % (cnt,len(imgfns)))
+    print('SExtractor,PSFex on %d of %d images' % (cnt,len(subset)))
     #SExtractor
     hdu=0
     maskfn= imgfn.replace('_scie_','_mask_')
@@ -209,7 +210,7 @@ for cnt,imgfn in enumerate(subset):
     if os.system(cmd):
         raise RuntimeError('Command failed: ' + cmd)                   
     #delete temporary mask-2 and invvar
-    #os.remove(maskfn)
-    #os.remove(invvarfn)
+    os.remove(maskfn)
+    os.remove(invvarfn)
 print('SExtractor,PSFex finished, remove invvar,mask files written to junk/')
 print('done')

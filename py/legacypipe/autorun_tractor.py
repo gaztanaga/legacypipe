@@ -21,7 +21,6 @@ else: raise ValueError
 cmd= ' '.join(['python','legacypipe/runptf.py','--radec %.2f %.2f' % (args.radec[0],args.radec[1]),\
                 '--decals-dir %s' % args.decals_dir,'--outdir %s' % args.outdir,\
                 '--pixpsf --splinesky --no-sdss --no-wise',\
-                '--pixscale %.2f' % pixscale,\
                 '--width %d --height %d' % (args.wh[0],args.wh[1])])
 if args.force_all: cmd+= ' --force-all'
 if args.coadd_bw: cmd+= ' --coadd-bw'
