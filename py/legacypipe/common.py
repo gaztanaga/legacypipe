@@ -459,11 +459,17 @@ def get_rgb(imgs, bands, mnmx=None, arcsinh=None, scales=None):
 
     Returns a (H,W,3) numpy array with values between 0 and 1.
     '''
-    bands = ''.join(bands)
-
+    if 'g_PTF' in bands or 'R_PTF' in bands:
+        new_bands= []
+        if 'g_PTF' in bands: new_bands.append('g_PTF')
+        if 'R_PTF' in bands: new_bands.append('R_PTF')
+        bands= new_bands
+    else: ''.join(bands)
     grzscales = dict(g = (2, 0.0066),
                       r = (1, 0.01),
                       z = (0, 0.025),
+                      g_PTF = (2, 0.0066),
+                      R_PTF = (1, 0.01),
                       )
 
     if scales is None:
@@ -488,9 +494,13 @@ def get_rgb(imgs, bands, mnmx=None, arcsinh=None, scales=None):
         
     h,w = imgs[0].shape
     rgb = np.zeros((h,w,3), np.float32)
+    print('################################------ in get_rgb')
+    print('################################------ imgs= ',imgs)
+    print('################################------ bands= ',bands)
     # Convert to ~ sigmas
     for im,band in zip(imgs, bands):
         plane,scale = scales[band]
+        print('################################------ get_rgb: band= ',band,'plane= ',plane)
         rgb[:,:,plane] = (im / scale).astype(np.float32)
 
     if mnmx is None:

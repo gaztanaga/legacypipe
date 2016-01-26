@@ -11,6 +11,9 @@ from astrometry.util.fits import fits_table
 from astrometry.util.util import Tan, Sip, anwcs_t
 from tractor.tractortime import TAITime
 
+#for SFDMap() including for PTF filters
+#from astrometry.util.starutil_numpy import *
+#from astrometry.util.util import *
 
 '''
 Code specific to images from the (intermediate) Palomar Transient Factory (iPTF/PTF), bands = g,R.
@@ -73,7 +76,8 @@ def ptf_zeropoint(imgfn):
     hdr=fitsio.read_header(imgfn)
     return hdr['IMAGEZPT'] + 2.5 * np.log10(hdr['EXPTIME'])
 
-
+def isPTF(bands):
+    return 'g_PTF' in bands or 'R_PTF' in bands
 
 class PtfImage(LegacySurveyImage):
     '''
@@ -464,98 +468,199 @@ class PtfDecals(Decals):
         print('ccd ra= ',T.ra,'ccd dec= ',T.dec) 
         return T
 
-def sed_matched_filters(bands):
-    '''
-    Determines which SED-matched filters to run based on the available
-    bands.
+#class SFDMap(object):
+#    # These come from Schlafly & Finkbeiner, arxiv 1012.4804v2, Table 6, Rv=3.1
+#    # but updated (and adding DES u) via email from Schlafly,
+#    # decam-data thread from 11/13/2014, "New recommended SFD coefficients for DECam."
+#    #
+#    # The coefficients for the four WISE filters are derived from Fitzpatrick 1999,
+#    # as recommended by Schafly & Finkbeiner, considered better than either the
+#    # Cardelli et al 1989 curves or the newer Fitzpatrick & Massa 2009 NIR curve
+#    # not vetted beyond 2 micron).
+#    # These coefficients are A / E(B-V) = 0.184, 0.113, 0.0241, 0.00910. 
+#    #
+#    extinctions = {
+#        'SDSS u': 4.239,
+#        'DES u': 3.995,
+#        'DES g': 3.214,
+#        'DES r': 2.165,
+#        'DES i': 1.592,
+#        'DES z': 1.211,
+#        'DES Y': 1.064,
+#        'WISE W1': 0.184,
+#        'WISE W2': 0.113,
+#        'WISE W3': 0.0241,
+#        'WISE W4': 0.00910,
+#        'PTF g': 3.214,
+#        'PTF R': 2.165,
+#        }
+#
+#    def __init__(self, ngp_filename=None, sgp_filename=None, dustdir=None):
+#        if dustdir is None:
+#            dustdir = os.environ.get('DUST_DIR', None)
+#        if dustdir is not None:
+#            dustdir = os.path.join(dustdir, 'maps')
+#        else:
+#            dustdir = '.'
+#            print 'Warning: $DUST_DIR not set; looking for SFD maps in current directory.'
+#        if ngp_filename is None:
+#            ngp_filename = os.path.join(dustdir, 'SFD_dust_4096_ngp.fits')
+#        if sgp_filename is None:
+#            sgp_filename = os.path.join(dustdir, 'SFD_dust_4096_sgp.fits')
+#        if not os.path.exists(ngp_filename):
+#            raise RuntimeError('Error: SFD map does not exist: %s' % ngp_filename)
+#        if not os.path.exists(sgp_filename):
+#            raise RuntimeError('Error: SFD map does not exist: %s' % sgp_filename)
+#        self.north = fitsio.read(ngp_filename)
+#        self.south = fitsio.read(sgp_filename)
+#        self.northwcs = anwcs_t(ngp_filename, 0)
+#        self.southwcs = anwcs_t(sgp_filename, 0)
+#
+#    @staticmethod
+#    def bilinear_interp_nonzero(image, x, y):
+#        H,W = image.shape
+#        x0 = np.floor(x).astype(int)
+#        y0 = np.floor(y).astype(int)
+#        # Bilinear interpolate, but not outside the bounds (where ebv=0)
+#        fx = np.clip(x - x0, 0., 1.)
+#        ebvA = image[y0,x0]
+#        ebvB = image[y0, np.clip(x0+1, 0, W-1)]
+#        ebv1 = (1.-fx) * ebvA + fx * ebvB
+#        ebv1[ebvA == 0] = ebvB[ebvA == 0]
+#        ebv1[ebvB == 0] = ebvA[ebvB == 0]
+#
+#        ebvA = image[np.clip(y0+1, 0, H-1), x0]
+#        ebvB = image[np.clip(y0+1, 0, H-1), np.clip(x0+1, 0, W-1)]
+#        ebv2 = (1.-fx) * ebvA + fx * ebvB
+#        ebv2[ebvA == 0] = ebvB[ebvA == 0]
+#        ebv2[ebvB == 0] = ebvA[ebvB == 0]
+#
+#        fy = np.clip(y - y0, 0., 1.)
+#        ebv = (1.-fy) * ebv1 + fy * ebv2
+#        ebv[ebv1 == 0] = ebv2[ebv1 == 0]
+#        ebv[ebv2 == 0] = ebv1[ebv2 == 0]
+#        return ebv
+#
+#    def ebv(self, ra, dec):
+#        l,b = radectolb(ra, dec)
+#        ebv = np.zeros_like(l)
+#        N = (b >= 0)
+#        for wcs,image,cut in [(self.northwcs, self.north, N),
+#                              (self.southwcs, self.south, np.logical_not(N))]:
+#            # Our WCS routines are mis-named... the SFD WCSes convert 
+#            #   X,Y <-> L,B.
+#            if sum(cut) == 0:
+#                continue
+#            ok,x,y = wcs.radec2pixelxy(l[cut], b[cut])
+#            assert(np.all(ok == 0))
+#            H,W = image.shape
+#            assert(np.all(x >= 0.5))
+#            assert(np.all(x <= (W+0.5)))
+#            assert(np.all(y >= 0.5))
+#            assert(np.all(y <= (H+0.5)))
+#            ebv[cut] = SFDMap.bilinear_interp_nonzero(image, x-1., y-1.)
+#        return ebv
+#
+#    def extinction(self, filts, ra, dec, get_ebv=False):
+#        ebv = self.ebv(ra, dec)
+#        factors = np.array([SFDMap.extinctions[f] for f in filts])
+#        rtn = factors[np.newaxis,:] * ebv[:,np.newaxis]
+#        if get_ebv:
+#            return ebv,rtn
+#        return rtn
 
-    Returns
-    -------
-    SEDs : list of (name, sed) tuples
-    
-    '''
-    print('######## KJB sed_matched_filters ##########')
-    if len(bands) == 1:
-        return [(bands[0], (1.,))]
+#def sed_matched_filters(bands):
+#    '''
+#    Determines which SED-matched filters to run based on the available
+#    bands.
+#
+#    Returns
+#    -------
+#    SEDs : list of (name, sed) tuples
+#    
+#    '''
+#    print('######## KJB sed_matched_filters ##########')
+#    if len(bands) == 1:
+#        return [(bands[0], (1.,))]
+#
+#    # single-band filters
+#    SEDs = []
+#    for i,band in enumerate(bands):
+#        sed = np.zeros(len(bands))
+#        sed[i] = 1.
+#        SEDs.append((band, sed))
+#
+#    if len(bands) > 1:
+#        flat = dict(g=1., r=1., z=1.,R=1.)
+#        SEDs.append(('Flat', [flat[b] for b in bands]))
+#        red = dict(g=2.5, r=1., z=0.4,R=1.)
+#        SEDs.append(('Red', [red[b] for b in bands]))
+#
+#    return SEDs
 
-    # single-band filters
-    SEDs = []
-    for i,band in enumerate(bands):
-        sed = np.zeros(len(bands))
-        sed[i] = 1.
-        SEDs.append((band, sed))
-
-    if len(bands) > 1:
-        flat = dict(g=1., r=1., z=1.,R=1.)
-        SEDs.append(('Flat', [flat[b] for b in bands]))
-        red = dict(g=2.5, r=1., z=0.4,R=1.)
-        SEDs.append(('Red', [red[b] for b in bands]))
-
-    return SEDs
-
-def get_rgb(imgs, bands, mnmx=None, arcsinh=None, scales=None):
-    '''
-    Given a list of images in the given bands, returns a scaled RGB
-    image.
-
-    *imgs*  a list of numpy arrays, all the same size, in nanomaggies
-    *bands* a list of strings, eg, ['g','r','z']
-    *mnmx*  = (min,max), values that will become black/white *after* scaling. Default is (-3,10)
-    *arcsinh* use nonlinear scaling as in SDSS
-    *scales*
-
-    Returns a (H,W,3) numpy array with values between 0 and 1.
-    '''
-    print('######## KJB get_rgb ##########')
-    bands = ''.join(bands)
-
-    grzscales = dict(g = (2, 0.0066),
-                      r = (1, 0.01),
-                      R = (1, 0.01),
-                      z = (0, 0.025),
-                      )
-
-    if scales is None:
-        if bands == 'grz':
-            scales = grzscales
-        elif bands == 'urz':
-            scales = dict(u = (2, 0.0066),
-                          r = (1, 0.01),
-                          z = (0, 0.025),
-                          )
-        elif bands == 'gri':
-            # scales = dict(g = (2, 0.004),
-            #               r = (1, 0.0066),
-            #               i = (0, 0.01),
-            #               )
-            scales = dict(g = (2, 0.002),
-                          r = (1, 0.004),
-                          i = (0, 0.005),
-                          )
-        else:
-            scales = grzscales
-        
-    h,w = imgs[0].shape
-    rgb = np.zeros((h,w,3), np.float32)
-    # Convert to ~ sigmas
-    for im,band in zip(imgs, bands):
-        plane,scale = scales[band]
-        rgb[:,:,plane] = (im / scale).astype(np.float32)
-
-    if mnmx is None:
-        mn,mx = -3, 10
-    else:
-        mn,mx = mnmx
-
-    if arcsinh is not None:
-        def nlmap(x):
-            return np.arcsinh(x * arcsinh) / np.sqrt(arcsinh)
-        rgb = nlmap(rgb)
-        mn = nlmap(mn)
-        mx = nlmap(mx)
-
-    rgb = (rgb - mn) / (mx - mn)
-    return np.clip(rgb, 0., 1.)
+#def get_rgb(imgs, bands, mnmx=None, arcsinh=None, scales=None):
+#    '''
+#    Given a list of images in the given bands, returns a scaled RGB
+#    image.
+#
+#    *imgs*  a list of numpy arrays, all the same size, in nanomaggies
+#    *bands* a list of strings, eg, ['g','r','z']
+#    *mnmx*  = (min,max), values that will become black/white *after* scaling. Default is (-3,10)
+#    *arcsinh* use nonlinear scaling as in SDSS
+#    *scales*
+#
+#    Returns a (H,W,3) numpy array with values between 0 and 1.
+#    '''
+#    print('######## KJB get_rgb ##########')
+#    bands = ''.join(bands)
+#
+#    grzscales = dict(g = (2, 0.0066),
+#                      r = (1, 0.01),
+#                      R = (1, 0.01),
+#                      z = (0, 0.025),
+#                      )
+#
+#    if scales is None:
+#        if bands == 'grz':
+#            scales = grzscales
+#        elif bands == 'urz':
+#            scales = dict(u = (2, 0.0066),
+#                          r = (1, 0.01),
+#                          z = (0, 0.025),
+#                          )
+#        elif bands == 'gri':
+#            # scales = dict(g = (2, 0.004),
+#            #               r = (1, 0.0066),
+#            #               i = (0, 0.01),
+#            #               )
+#            scales = dict(g = (2, 0.002),
+#                          r = (1, 0.004),
+#                          i = (0, 0.005),
+#                          )
+#        else:
+#            scales = grzscales
+#        
+#    h,w = imgs[0].shape
+#    rgb = np.zeros((h,w,3), np.float32)
+#    # Convert to ~ sigmas
+#    for im,band in zip(imgs, bands):
+#        plane,scale = scales[band]
+#        rgb[:,:,plane] = (im / scale).astype(np.float32)
+#
+#    if mnmx is None:
+#        mn,mx = -3, 10
+#    else:
+#        mn,mx = mnmx
+#
+#    if arcsinh is not None:
+#        def nlmap(x):
+#            return np.arcsinh(x * arcsinh) / np.sqrt(arcsinh)
+#        rgb = nlmap(rgb)
+#        mn = nlmap(mn)
+#        mx = nlmap(mx)
+#
+#    rgb = (rgb - mn) / (mx - mn)
+#    return np.clip(rgb, 0., 1.)
  
 
 def main():
@@ -577,7 +682,7 @@ def main():
     decals = PtfDecals(decals_dir=opt.decals_dir)
     kwargs['decals'] = decals
     
-    kwargs['bands'] = 'gR'
+    kwargs['bands'] = ['g','r','z','g_PTF','R_PTF']
     kwargs['pixscale'] = 1.01
     if kwargs['forceAll']: kwargs['writePickles']= False
     else: kwargs['writePickles']= True

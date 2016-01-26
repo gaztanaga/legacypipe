@@ -76,9 +76,9 @@ def sed_matched_filters(bands):
         SEDs.append((band, sed))
 
     if len(bands) > 1:
-        flat = dict(g=1., r=1., z=1.)
+        flat = dict(g=1., r=1., z=1., g_PTF=1.,R_PTF=1.)
         SEDs.append(('Flat', [flat[b] for b in bands]))
-        red = dict(g=2.5, r=1., z=0.4)
+        red = dict(g=2.5, r=1., z=0.4, g_PTF=2.5,R_PTF=1.)
         SEDs.append(('Red', [red[b] for b in bands]))
 
     return SEDs
