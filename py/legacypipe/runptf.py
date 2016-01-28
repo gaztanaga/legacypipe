@@ -682,7 +682,7 @@ def main():
     decals = PtfDecals(decals_dir=opt.decals_dir)
     kwargs['decals'] = decals
     
-    kwargs['bands'] = ['g','r','z','g_PTF','R_PTF']
+    #kwargs['bands'] = ['g','r','z','g_PTF','R_PTF']
     kwargs['pixscale'] = 1.01
     if kwargs['forceAll']: kwargs['writePickles']= False
     else: kwargs['writePickles']= True

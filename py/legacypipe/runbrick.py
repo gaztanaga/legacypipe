@@ -55,10 +55,6 @@ from legacypipe.common import *
 from legacypipe.utils import RunbrickError, NothingToDoError, iterwrapper
 from legacypipe.runbrick_plots import _plot_mods
 
-#a few PTF data things
-from legacypipe.runptf import isPTF
-from legacypipe.ptf_dust_map import SFDMap as ptf_SFDMap
-
 
 ## GLOBALS!  Oh my!
 nocache = True
@@ -547,8 +543,7 @@ def _coadds(tims, bands, targetwcs,
                 badbits = 0
                 for bitname in ['badpix', 'cr', 'trans', 'edge', 'edge2']:
                     badbits |= CP_DQ_BITS[bitname]
-                if isPTF(bands): goodpix = (dq == 0)
-                else: goodpix = ((dq & badbits) == 0)
+                goodpix = ((dq & badbits) == 0)
 
                 coimg[Yo,Xo] += goodpix * im
                 con  [Yo,Xo] += goodpix
@@ -1067,10 +1062,7 @@ def stage_image_coadds(targetwcs=None, bands=None, tims=None, outdir=None,
         rgb = get_rgb(ims, bands, **rgbkw)
         kwa = {}
         if coadd_bw and len(bands) == 1:
-            if isPTF(bands):
-                if bands[0] == 'R_PTF': i=1
-                else: i=2 
-            else: i = 'zrg'.index(bands[0])
+            i = 'zrg'.index(bands[0])
             rgb = rgb[:,:,i]
             kwa = dict(cmap='gray')
         plt.imsave(tmpfn, rgb, origin='lower', **kwa)
@@ -1081,7 +1073,6 @@ def stage_image_coadds(targetwcs=None, bands=None, tims=None, outdir=None,
         print('Wrote', jpegfn)
 
         # Blob-outlined version
-        print('################# blobs= ',blobs)
         if blobs is not None:
             from scipy.ndimage.morphology import binary_dilation
             outline = (binary_dilation(blobs >= 0, structure=np.ones((3,3)))
@@ -2052,9 +2043,7 @@ def stage_fitblobs_finish(
 
             namemap = dict(ptsrc='psf', simple='simp')
             prefix = namemap.get(srctype,srctype)
-            
-            if isPTF(bands): allbands=['u','g','r','i','z','Y','g_PTF','R_PTF']
-            print('-----allbands= ',allbands,'bands= ',bands)
+
             TT,hdr = prepare_fits_catalog(xcat, None, TT, hdr, bands, None,
                                           allbands=allbands, prefix=prefix+'_',
                                           save_invvars=False)
@@ -3012,9 +3001,7 @@ def _one_blob(X):
 
                 t1,t2,t3 = dict(g=(24.0, 23.7, 23.4),
                                 r=(23.4, 23.1, 22.8),
-                                z=(22.5, 22.2, 21.9),
-                                g_PTF=(24.0, 23.7, 23.4),
-                                R_PTF=(23.4, 23.1, 22.8))[band]
+                                z=(22.5, 22.2, 21.9))[band]
                 Nsigma = 5.
                 sig = NanoMaggies.magToNanomaggies(t1) / Nsigma
                 target1 = 1./sig**2
@@ -3949,10 +3936,7 @@ def stage_coadds(bands=None, version_header=None, targetwcs=None,
         rgb = get_rgb(ims, bands, **rgbkw)
         kwa = {}
         if coadd_bw and len(bands) == 1:
-            if isPTF(bands): 
-                if bands[0] == 'R_PTF': i=1
-                else: i=2
-            else: i = 'zrg'.index(bands[0])
+            i = 'zrg'.index(bands[0])
             rgb = rgb[:,:,i]
             kwa = dict(cmap='gray')
         plt.imsave(tmpfn, rgb, origin='lower', **kwa)
@@ -4329,15 +4313,10 @@ def stage_writecat(
     trymakedirs(dirnm)
 
     print('Reading SFD maps...')
-    if isPTF(bands):
-        sfd = ptf_SFDMap()
-        filts = ['%s %s' % ('DES', f) for f in 'ugrzY']
-    else: 
-        sfd = SFDMap()
-        filts = ['%s %s' % ('DES', f) for f in 'ugrzY']
+    sfd = SFDMap()
+    filts = ['%s %s' % ('DES', f) for f in allbands]
     wisebands = ['WISE W1', 'WISE W2', 'WISE W3', 'WISE W4']
-    ptfbands= ['PTF g','PTF R'] #KJB
-    ebv,ext = sfd.extinction(filts + wisebands + ptfbands, T2.ra, T2.dec, get_ebv=True)
+    ebv,ext = sfd.extinction(filts + wisebands, T2.ra, T2.dec, get_ebv=True)
     ext = ext.astype(np.float32)
     decam_extinction = ext[:,:len(allbands)]
     wise_extinction = ext[:,len(allbands):]

@@ -83,7 +83,7 @@ def ptf_exposure_metadata(filenames, hdus=None, trim=None):
             vals['AVSKY'].append(0.) #estimate of sky level, ok to set to 0 in legacypipe
             vals['EXTNAME'].append(os.path.basename(fn)[-8:-5]) #CCD id, ex) N16 for DECam
             vals['CCDNAME'][-1]= os.path.basename(fn)[-8:-5]
-            vals['FILTER'][-1]= vals['FILTER'][-1].strip()+'_PTF'  #unique ptf band name
+            vals['FILTER'][-1]= vals['FILTER'][-1].strip().lower()  #unique ptf band name
             vals['EXPNUM'].append(0) #default value givein in function "exposure_metadata"
             vals['CAMERA'].append('ptf') #default value givein in function "exposure_metadata"
             vals['IMAGE_FILENAME'].append(os.path.basename(fn))

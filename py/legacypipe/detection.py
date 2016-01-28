@@ -76,9 +76,9 @@ def sed_matched_filters(bands):
         SEDs.append((band, sed))
 
     if len(bands) > 1:
-        flat = dict(g=1., r=1., z=1., g_PTF=1.,R_PTF=1.)
+        flat = dict(g=1., r=1., z=1.)
         SEDs.append(('Flat', [flat[b] for b in bands]))
-        red = dict(g=2.5, r=1., z=0.4, g_PTF=2.5,R_PTF=1.)
+        red = dict(g=2.5, r=1., z=0.4)
         SEDs.append(('Red', [red[b] for b in bands]))
 
     return SEDs
@@ -172,7 +172,10 @@ def run_sed_matched_filters(SEDs, bands, detmaps, detivs, omit_xy,
     # New peaks:
     peakx = xx[n0:]
     peaky = yy[n0:]
-    if isinstance(peakx,list): peakx,peaky= np.array(peakx),np.array(peaky)
+
+    if len(peakx) == 0:
+        return None,None,None
+
     # Add sources for the new peaks we found
     pr,pd = targetwcs.pixelxy2radec(peakx+1, peaky+1)
     print('Adding', len(pr), 'new sources')
