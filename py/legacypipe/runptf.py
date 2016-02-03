@@ -661,7 +661,11 @@ class PtfDecals(Decals):
 #
 #    rgb = (rgb - mn) / (mx - mn)
 #    return np.clip(rgb, 0., 1.)
- 
+def make_dir(name):
+    if not os.path.exists(name): os.makedirs(name)
+    else: print('WARNING path exists: ',name)
+
+
 
 def main():
     from runbrick import run_brick, get_parser, get_runbrick_kwargs
@@ -683,6 +687,7 @@ def main():
     kwargs['decals'] = decals
     
     #kwargs['bands'] = ['g','r','z','g_PTF','R_PTF']
+    make_dir(opt.outdir)
     kwargs['pixscale'] = 1.01
     if kwargs['forceAll']: kwargs['writePickles']= False
     else: kwargs['writePickles']= True
