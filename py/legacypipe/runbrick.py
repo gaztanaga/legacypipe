@@ -1381,6 +1381,25 @@ def stage_srcs(coimgs=None, cons=None,
             plt.suptitle('Median filter of detection map: %s band' %
                          bands[i])
             ps.savefig()
+        KJB=True
+        if KJB:
+            sig1 = 1./np.sqrt(np.median(detiv[detiv > 0]))
+            kwa = dict(vmin=-2.*sig1, vmax=10.*sig1)
+
+            subbed = detmap.copy()
+            S = binning
+            for ii in range(S):
+                for jj in range(S):
+                    subbed[ii::S, jj::S] -= smoo
+
+            plt.clf()
+            plt.subplot(1,2,1)
+            dimshow(detmap, **kwa)
+            plt.title('detmap')
+            plt.subplot(1,2,2)
+            dimshow(subbed, **kwa)
+            plt.title('detmap w/median filter')
+            plt.savefig('./detmap_%s.png' % bands[i])
 
     # Handle the margin of interpolated (masked) pixels around
     # saturated pixels
@@ -2483,7 +2502,9 @@ def _one_blob(X):
     bigblob = (blobw * blobh) > 100*100
 
     # 50 CCDs is over 90th percentile of bricks in DR2.
-    many_exposures = len(timargs) >= 50
+    #KJB, PTF may want use 250 images at once, so don't allow subset to be taken
+    many_exposures = len(timargs) >= 10000
+    print('----many_exposures = ',many_exposures)
 
     blobwcs = brickwcs.get_subimage(bx0, by0, blobw, blobh)
     ok,x0,y0 = blobwcs.radec2pixelxy(
@@ -3365,15 +3386,170 @@ def _one_blob(X):
             plt.suptitle('Blob %i, source %i: was: \n%s' %
                          (iblob, i, str(src)), fontsize=10)
             ps.savefig()
-
+        
         # This determines the order of the elements in the DCHISQ
         # column of the catalog.
         modnames = ['ptsrc', 'simple', 'dev', 'exp', 'comp']
 
+        print('----chisqs=',chisqs)
+        print('----galaxy_margin=',galaxy_margin)
         keepmod = _select_model(chisqs, nparams, galaxy_margin)
 
         keepsrc = dict(none=None, ptsrc=ptsrc, simple=simple,
                        dev=dev, exp=exp, comp=comp)[keepmod]
+        #model has been determined, plot postage stamp each model and sum of chisqs, label which of these was chosen as model
+        KJB=True
+        if KJB:
+            def KJB_select_model(chisqs, nparams, galaxy_margin):
+                '''
+                Returns keepmod
+                '''
+                stats={}
+                keepmod = 'none'
+
+                # This is our "detection threshold": 5-sigma in
+                # *parameter-penalized* units; ie, ~5.2-sigma for point sources
+                cut = 5.**2
+                stats['cut'] = cut
+                # Take the best of all models computed
+                diff = max([chisqs[name] - nparams[name] for name in chisqs.keys()
+                            if name != 'none'])
+                stats['diff'] = diff
+
+                if diff < cut:
+                    pass #return keepmod
+
+                # We're going to keep this source!
+                if chisqs['ptsrc'] > chisqs['simple']:
+                    #print('Keeping source; PTSRC is better than SIMPLE')
+                    keepmod = 'ptsrc'
+                else:
+                    #print('Keeping source; SIMPLE is better than PTSRC')
+                    keepmod = 'simple'
+
+                if not 'exp' in chisqs:
+                    pass #return keepmod
+
+                # This is our "upgrade" threshold: how much better a galaxy
+                # fit has to be versus ptsrc, and comp versus galaxy.
+                cut = galaxy_margin
+
+                # This is the "fractional" upgrade threshold for ptsrc/simple->dev/exp:
+                # 2% of ptsrc vs nothing
+                fcut = 0.02 * chisqs['ptsrc']
+                #print('Cut: max of', cut, 'and', fcut, ' (fraction of chisq_psf=%.1f)'
+                # % chisqs['ptsrc'])
+                cut = max(cut, fcut)
+                stats['cut_final'] = cut
+
+                if 'exp' in chisqs:
+                    expdiff = chisqs['exp'] - chisqs[keepmod]
+                    stats['expdiff'] = expdiff
+                    devdiff = chisqs['dev'] - chisqs[keepmod]
+                    stats['devdiff'] = devdiff
+
+                #print('EXP vs', keepmod, ':', expdiff)
+                #print('DEV vs', keepmod, ':', devdiff)
+
+                #if not (expdiff > cut or devdiff > cut):
+                #    #print('Keeping', keepmod)
+                #    return keepmod
+
+                #if expdiff > devdiff:
+                #    #print('Upgrading from PTSRC to EXP: diff', expdiff)
+                #    keepmod = 'exp'
+                #else:
+                #    #print('Upgrading from PTSRC to DEV: diff', expdiff)
+                #    keepmod = 'dev'
+
+                #if not 'comp' in chisqs:
+                #    return keepmod
+
+                #diff = chisqs['comp'] - chisqs[keepmod]
+                ##print('Comparing', keepmod, 'to comp.  cut:', cut, 'comp:', diff)
+                #if diff < cut:
+                #    return keepmod
+
+                ##print('Upgrading from dev/exp to composite.')
+                #keepmod = 'comp'
+                return stats
+
+
+            from collections import OrderedDict
+            plt.clf()
+            rows,cols = 2, 6
+            mods = OrderedDict([('none',None), ('ptsrc',ptsrc),
+                                ('simple',simple),
+                                ('dev',dev), ('exp',exp), ('comp',comp)])
+            for imod,modname in enumerate(mods.keys()):
+
+                if mod != 'none' and not modname in chisqs:
+                    continue
+
+                srccat[0] = mods[modname]
+
+                print('Plotting model for blob', iblob, 'source', i,
+                      ':', modname)
+                print(srccat[0])
+
+                srctractor.setModelMasks(None)
+
+                plt.subplot(rows, cols, imod+1)
+
+                if modname != 'none':
+                    modimgs = list(srctractor.getModelImages())
+                    comods,nil = compute_coadds(srctims, bands, srcwcs,
+                                                images=modimgs)
+                    dimshow(get_rgb(comods, bands), ticks=False)
+                    plt.title(modname)
+                    chis = [((tim.getImage() - mod) * tim.getInvError())**2
+                            for tim,mod in zip(srctims, modimgs)]
+                    res = [(tim.getImage() - mod) for tim,mod in
+                           zip(srctims, modimgs)]
+                else:
+                    coimgs, cons = compute_coadds(srctims, bands, srcwcs)
+                    dimshow(get_rgb(coimgs, bands))
+                    ax = plt.axis()
+                    ok,x,y = blobwcs.radec2pixelxy(src.getPosition().ra,
+                                                     src.getPosition().dec)
+                    plt.plot(x-1, y-1, 'r+')
+                    plt.axis(ax)
+                    plt.title("none")
+                    chis = [((tim.getImage()) * tim.getInvError())**2
+                              for tim in srctims]
+                    res = [tim.getImage() for tim in srctims]
+
+                if False:
+                    cochisqs,nil = compute_coadds(tims, bands, blobwcs,
+                                                  images=chis)
+                    cochisq = reduce(np.add, cochisqs)
+                    plt.subplot(rows, cols, imod+1+cols)
+                    dimshow(cochisq, vmin=0, vmax=25)
+                    plt.title('cochisq')
+                else:
+                    # residuals
+                    coresids,nil = compute_coadds(srctims, bands, srcwcs,
+                                                  images=res)
+                    plt.subplot(rows, cols, imod+1+cols)
+                    dimshow(get_rgb(coresids, bands, **rgbkwargs_resid),
+                            ticks=False)
+                plt.title('chisq %.0f' % chisqs[modname], fontsize=8)
+            stats= KJB_select_model(chisqs, nparams, galaxy_margin)
+            print('stats=',stats)
+            if 'expdiff' in stats: l1='chisq: pt=%.0f, simp=%.0f, dev=%.0f, exp=%.0f\n' % (chisqs['ptsrc'],chisqs['simple'],chisqs['dev'],chisqs['exp'])
+            else: l1='chisq: pt=%.0f, simp=%.0f\n' % (chisqs['ptsrc'],chisqs['simple'])
+            l2='no model if %.0f < %.0f; max(penalized X2_i)\n' % (stats['diff'],stats['cut'])
+            l3='simple if %.0f > %.0f; simp X2 > pt X2\n' % (chisqs['simple'],chisqs['ptsrc'])
+            if 'expdiff' in stats: l4='exp or dev if %.0f > %.0f; delta X2 > new cut = max(0.02 pt X2,cut)' % (max(stats['expdiff'],stats['devdiff']),stats['cut_final'])
+            else: l4=''
+            title='MODEL=%s, %s\n' %(keepmod,str(src))
+            plt.suptitle(title+l1+l2+l3+l4, fontsize=8)
+            plt.subplots_adjust(hspace=0)
+            plt.savefig('./Blob_%i_source_%i.png' % (iblob, i))
+
+
+
+
 
         B.dchisqs[i, :] = np.array([chisqs.get(k,0) for k in modnames])
         B.flags[i] = allflags.get(keepmod, 0)

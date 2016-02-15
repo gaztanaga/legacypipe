@@ -543,7 +543,10 @@ def sed_matched_detection(sedname, sed, detmaps, detivs, bands,
     if ps is not None:
         pxdrop = px[np.logical_not(keep)]
         pydrop = py[np.logical_not(keep)]
-
+    KJB=True
+    if KJB:
+        pxdrop = px[np.logical_not(keep)]
+        pydrop = py[np.logical_not(keep)]
     py = py[keep]
     px = px[keep]
 
@@ -575,5 +578,33 @@ def sed_matched_detection(sedname, sed, detmaps, detivs, bands,
         plt.figlegend((p3[0],p1[0],p2[0]), ('Existing', 'Keep', 'Drop'),
                       'upper left')
         ps.savefig()
+    if KJB:
+        from astrometry.util.plotutils import dimshow
+        crossa = dict(ms=10, mew=1.5)
+        green = (0,1,0)
 
+        def plot_boundary_map(X):
+            bounds = binary_dilation(X) - X
+            H,W = X.shape
+            rgba = np.zeros((H,W,4), np.uint8)
+            rgba[:,:,1] = bounds*255
+            rgba[:,:,3] = bounds*255
+            plt.imshow(rgba, interpolation='nearest', origin='lower')
+
+        plt.clf()
+        plt.subplot(1,2,2)
+        dimshow(sedsn, vmin=-2, vmax=100, cmap='hot', ticks=False)
+        plt.title('sedsn')
+        plt.subplot(1,2,1)
+        dimshow(hotblobs, vmin=0, vmax=1, cmap='hot')
+        ax = plt.axis()
+        p1 = plt.plot(px, py, 'g+', ms=8, mew=2)
+        p2 = plt.plot(pxdrop, pydrop, 'm+', ms=8, mew=2)
+        p3 = plt.plot(xomit, yomit, 'r+', ms=8, mew=2)
+        plt.axis(ax)
+        plt.title('SED %s: hot blobs' % sedname)
+        plt.figlegend((p3[0],p1[0],p2[0]), ('Existing', 'Keep', 'Drop'),
+                      'upper left')
+        plt.savefig('./sedmap_%s.png' % sedname)
+     
     return hotblobs, px, py, aper, peakval
