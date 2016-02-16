@@ -63,6 +63,27 @@ nocache = True
 rgbkwargs = dict(mnmx=(-1,100.), arcsinh=1.)
 rgbkwargs_resid = dict(mnmx=(-5,5))
 
+KJB=True
+if KJB:
+    min_chi2,best_img= {},{}
+    def KJB_minchi_img(srctractor, bands):
+        '''return min_chi2, best_img
+        chi2 is sum of all pixel's chi2 values
+        min_chi2= dict with keys r,g having min chi2 of all images in each band
+        best_img also dict keys r,g which are postage stamp array for the min_chi2 image'''
+        min_chi2 = dict([(b,1e10) for b in bands])
+        best_img={}
+        for img in srctractor.images:
+            chi2 = srctractor.getChiImage(img=img)
+            chi2 = (chi2**2).sum()
+            print('KJB: chi2=',chi2)
+            if chi2 < min_chi2[img.band]:
+                min_chi2[img.band] = chi2
+                best_img[img.band]= img.getImage()
+        print("best_img['r'].shape=",best_img['r'].shape)
+        return min_chi2,best_img
+
+
 def runbrick_global_init():
     t0 = Time()
     print('Starting process', os.getpid(), Time()-t0)
@@ -3319,6 +3340,10 @@ def _one_blob(X):
             B.all_models[i][name] = newsrc.copy()
             B.all_model_flags[i][name] = thisflags
 
+            KJB=True
+            if KJB:
+                #min(sum chi2 over all pixels) in r and g bands for each name = model
+                min_chi2[name],best_img[name]= KJB_minchi_img(srctractor, bands)
         # if plots:
         #    _plot_mods(tims, plotmods, plotmodnames, bands, None, None,
         #               bslc, blobw, blobh, ps)
@@ -3477,7 +3502,7 @@ def _one_blob(X):
 
             from collections import OrderedDict
             plt.clf()
-            rows,cols = 2, 6
+            rows,cols = 4, 6
             mods = OrderedDict([('none',None), ('ptsrc',ptsrc),
                                 ('simple',simple),
                                 ('dev',dev), ('exp',exp), ('comp',comp)])
@@ -3533,7 +3558,15 @@ def _one_blob(X):
                     plt.subplot(rows, cols, imod+1+cols)
                     dimshow(get_rgb(coresids, bands, **rgbkwargs_resid),
                             ticks=False)
-                plt.title('chisq %.0f' % chisqs[modname], fontsize=8)
+                    plt.title('chisq %.0f' % chisqs[modname], fontsize=8)
+                #plot best_img (lowest chi2 for each model)
+                if modname != 'none':
+                    plt.subplot(rows, cols, imod+1+2*cols)
+                    dimshow(best_img[modname]['r'][::-1],ticks=False)
+                    plt.title('r-%s minX2img' % modname,fontsize=8)
+                    plt.subplot(rows, cols, imod+1+3*cols)
+                    dimshow(best_img[modname]['g'][::-1],ticks=False)
+                    plt.title('g-%s minX2img' % modname,fontsize=8)
             stats= KJB_select_model(chisqs, nparams, galaxy_margin)
             print('stats=',stats)
             if 'expdiff' in stats: l1='chisq: pt=%.0f, simp=%.0f, dev=%.0f, exp=%.0f\n' % (chisqs['ptsrc'],chisqs['simple'],chisqs['dev'],chisqs['exp'])
@@ -3546,10 +3579,6 @@ def _one_blob(X):
             plt.suptitle(title+l1+l2+l3+l4, fontsize=8)
             plt.subplots_adjust(hspace=0)
             plt.savefig('./Blob_%i_source_%i.png' % (iblob, i))
-
-
-
-
 
         B.dchisqs[i, :] = np.array([chisqs.get(k,0) for k in modnames])
         B.flags[i] = allflags.get(keepmod, 0)
