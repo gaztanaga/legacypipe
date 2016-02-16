@@ -5008,7 +5008,7 @@ def run_brick(brick, radec=None, pixscale=0.262,
         plotbase = plot_base_default
     ps = PlotSequence(plotbase % dict(brick=brick))
     #KJB, HACK!
-    ps.outdir = os.path.join(outdir,'../') #coadd/ gets added onto outdir for whatever reason
+    ps.outdir = outdir 
     ####
     initargs.update(ps=ps)
 
