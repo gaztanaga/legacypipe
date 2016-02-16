@@ -1433,7 +1433,8 @@ def stage_srcs(coimgs=None, cons=None,
             plt.subplot(1,2,2)
             dimshow(subbed, **kwa)
             plt.title('detmap w/median filter')
-            plt.savefig('./detmap_%s.png' % bands[i])
+            print('<<<<<<<<<<<<< ps.poutdir=',ps.outdir)
+            plt.savefig(os.path.join(ps.outdir,'detmap_%s.png' % bands[i]))
 
     # Handle the margin of interpolated (masked) pixels around
     # saturated pixels
@@ -3628,7 +3629,8 @@ def _one_blob(X):
             title='MODEL=%s, %s\n' %(keepmod,str(src))
             plt.suptitle(title+l1+l2+l3+l4, fontsize=8)
             plt.subplots_adjust(hspace=0)
-            plt.savefig('./Blob_%i_source_%i.png' % (iblob, i))
+            print('<<<<<<<<<<<<< ps.poutdir=',ps.outdir)
+            plt.savefig(os.path.join(ps.outdir,'Blob_%i_source_%i.png' % (iblob, i)))
 
         B.dchisqs[i, :] = np.array([chisqs.get(k,0) for k in modnames])
         B.flags[i] = allflags.get(keepmod, 0)
@@ -5005,6 +5007,9 @@ def run_brick(brick, radec=None, pixscale=0.262,
     if plotbase is None:
         plotbase = plot_base_default
     ps = PlotSequence(plotbase % dict(brick=brick))
+    #KJB, HACK!
+    ps.outdir = os.path.join(outdir,'../') #coadd/ gets added onto outdir for whatever reason
+    ####
     initargs.update(ps=ps)
 
     if plotnumber:
