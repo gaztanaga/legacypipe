@@ -64,24 +64,37 @@ rgbkwargs = dict(mnmx=(-1,100.), arcsinh=1.)
 rgbkwargs_resid = dict(mnmx=(-5,5))
 
 KJB=True
-if KJB:
-    min_chi2,best_img= {},{}
-    def KJB_minchi_img(srctractor, bands):
-        '''return min_chi2, best_img
-        chi2 is sum of all pixel's chi2 values
-        min_chi2= dict with keys r,g having min chi2 of all images in each band
-        best_img also dict keys r,g which are postage stamp array for the min_chi2 image'''
-        min_chi2 = dict([(b,1e10) for b in bands])
-        best_img={}
-        for img in srctractor.images:
-            chi2 = srctractor.getChiImage(img=img)
-            chi2 = (chi2**2).sum()
-            print('KJB: chi2=',chi2)
-            if chi2 < min_chi2[img.band]:
-                min_chi2[img.band] = chi2
-                best_img[img.band]= img.getImage()
-        print("best_img['r'].shape=",best_img['r'].shape)
-        return min_chi2,best_img
+#if KJB:
+    #m_map = dict(ptsrc=0,simple=1,dev=2,exp=3,comp=4)
+    #b_map = dict(r=0,g=1)
+    #chi2_all=np.zeros((len(m_map.keys()),len(b_map.keys()),len(srctractor.images)))-1
+    #for name in modelnames:
+    #    for cnt,img in enumerate(srctractor.images):
+    #        chi = srctractor.getChiImage(img=img)
+    #        chi2_all[m_map[name],b_map[img.band],cnt] = (chi**2).sum()
+    #assert( (chi_all > 0).all() )
+    #dchi2_all= np.abs(chi2_all[1:,:,:]-chi2_all[0,:,:])
+    #ith_img= np.where(dchi2_all == dchi2_all.max())[2]
+    #if len(ith_img > 1): ith_img=ith_img[0]
+    #best_img= srctractor.images[ith_img]
+    #best_img= best_image.getImage()
+    #min_chi2,best_img= {},{}
+    #def KJB_minchi_img(srctractor, bands):
+    #    '''return min_chi2, best_img
+    #    chi2 is sum of all pixel's chi2 values
+    #    min_chi2= dict with keys r,g having min chi2 of all images in each band
+    #    best_img also dict keys r,g which are postage stamp array for the min_chi2 image'''
+    #    min_chi2 = dict([(b,1e10) for b in bands])
+    #    best_img={}
+    #    for img in srctractor.images:
+    #        chi2 = srctractor.getChiImage(img=img)
+    #        chi2 = (chi2**2).sum()
+    #        print('KJB: chi2=',chi2)
+    #        if chi2 < min_chi2[img.band]:
+    #            min_chi2[img.band] = chi2
+    #            best_img[img.band]= img.getImage()
+    #    print("best_img['r'].shape=",best_img['r'].shape)
+    #    return min_chi2,best_img
 
 
 def runbrick_global_init():
@@ -3102,7 +3115,17 @@ def _one_blob(X):
                 dimshow(get_rgb(coimgs, bands))
                 plt.title('To-depth data')
                 ps.savefig()
-
+        #KJB, store chi2.sum() for every image in every band
+        print('-----KJB----- bands=',bands)
+        for b in bands: print('-----KJB----- b=',b)
+        m_map = dict(ptsrc=0,simple=1,dev=2,exp=3,comp=4)
+        m_map_rev = ['ptsrc','simple','dev','exp','comp']
+        b_map, b_map_rev = {},[]
+        for cnt,b in enumerate(bands): 
+            b_map[b]=cnt
+            b_map_rev.append( b )
+        chi2_all=np.empty((len(m_map.keys()),len(b_map.keys()),len(srctractor.images))) *np.nan
+        #### 
         allflags = {}
         for name,newsrc in trymodels:
 
@@ -3340,10 +3363,13 @@ def _one_blob(X):
             B.all_models[i][name] = newsrc.copy()
             B.all_model_flags[i][name] = thisflags
 
+            #on model "name" for all N images in srctractor.images
+            #for this model, get chi2.sum() for each image 
             KJB=True
             if KJB:
-                #min(sum chi2 over all pixels) in r and g bands for each name = model
-                min_chi2[name],best_img[name]= KJB_minchi_img(srctractor, bands)
+                for cnt,img in enumerate(srctractor.images):
+                    chi = srctractor.getChiImage(img=img)
+                    chi2_all[m_map[name],b_map[img.band],cnt] = (chi**2).sum()
         # if plots:
         #    _plot_mods(tims, plotmods, plotmodnames, bands, None, None,
         #               bslc, blobw, blobh, ps)
@@ -3409,7 +3435,7 @@ def _one_blob(X):
                             ticks=False)
                 plt.title('chisq %.0f' % chisqs[modname], fontsize=8)
             plt.suptitle('Blob %i, source %i: was: \n%s' %
-                         (iblob, i, str(src)), fontsize=10)
+                         (iblob, i, str(src)), fontsize=8)
             ps.savefig()
         
         # This determines the order of the elements in the DCHISQ
@@ -3425,6 +3451,30 @@ def _one_blob(X):
         #model has been determined, plot postage stamp each model and sum of chisqs, label which of these was chosen as model
         KJB=True
         if KJB:
+            #get images with largest different in chi2 b/w its model and ptsrc
+            dchi2_all= np.abs(chi2_all[1:,:,:]-chi2_all[0,:,:])
+            ind= np.isnan(dchi2_all) == False #shape (bands,images)
+            top5= np.sort(dchi2_all[ind])[::-1][:5]
+            best_imgs=dict(model=[],band=[],img=[]) 
+            for cnt,top in enumerate(top5):
+                kmod,kband,kimg= np.where(dchi2_all == top)
+                kmod,kband,kimg= kmod[0],kband[0],kimg[0] #store integer, if multi indices then first index
+                best_imgs['model'].append( m_map_rev[kmod+1] )
+                best_imgs['band'].append( b_map_rev[kband] )
+                tmpimg= srctractor.images[kimg]
+                best_imgs['img'].append( tmpimg.getImage() )
+            #for cnt,kname in enumerate(['simple', 'dev', 'exp', 'comp']):
+            #    ind= np.isnan(dchi2_all[cnt,:,:]) == False #shape (bands,images)
+            #    #print('---KJB--- dchi2_all[i,ind].shape= ',dchi2_all[i,ind].shape)
+            #    #print('---KJB--- dchi2_all[i,ind].max()= ',dchi2_all[i,ind].max())
+            #    if np.isnan(dchi2_all[cnt,:,:]).all():
+            #        best_img[kname]= 'none'
+            #    else:
+            #        ith_img= np.where(dchi2_all[cnt,:,:] == dchi2_all[cnt,ind].max())[1] #images is now 1st index not 2nd
+                #        if len(ith_img > 1): ith_img=ith_img[0]
+            #        best_img[kname]= srctractor.images[ith_img]
+            #        best_img[kname]= best_img[kname].getImage()
+
             def KJB_select_model(chisqs, nparams, galaxy_margin):
                 '''
                 Returns keepmod
@@ -3506,6 +3556,7 @@ def _one_blob(X):
             mods = OrderedDict([('none',None), ('ptsrc',ptsrc),
                                 ('simple',simple),
                                 ('dev',dev), ('exp',exp), ('comp',comp)])
+            tmp_cnt=0
             for imod,modname in enumerate(mods.keys()):
 
                 if mod != 'none' and not modname in chisqs:
@@ -3562,11 +3613,10 @@ def _one_blob(X):
                 #plot best_img (lowest chi2 for each model)
                 if modname != 'none':
                     plt.subplot(rows, cols, imod+1+2*cols)
-                    dimshow(best_img[modname]['r'][::-1],ticks=False)
-                    plt.title('r-%s minX2img' % modname,fontsize=8)
-                    plt.subplot(rows, cols, imod+1+3*cols)
-                    dimshow(best_img[modname]['g'][::-1],ticks=False)
-                    plt.title('g-%s minX2img' % modname,fontsize=8)
+                    print('tmp_cnt=',tmp_cnt,"len(best_imgs['img'])=",len(best_imgs['img']) )
+                    dimshow(best_imgs['img'][tmp_cnt],ticks=False)
+                    plt.title('%s-%s' % (best_imgs['model'][tmp_cnt],best_imgs['band'][tmp_cnt]),fontsize=8)
+                    tmp_cnt+=1
             stats= KJB_select_model(chisqs, nparams, galaxy_margin)
             print('stats=',stats)
             if 'expdiff' in stats: l1='chisq: pt=%.0f, simp=%.0f, dev=%.0f, exp=%.0f\n' % (chisqs['ptsrc'],chisqs['simple'],chisqs['dev'],chisqs['exp'])

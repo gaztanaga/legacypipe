@@ -1,7 +1,7 @@
 '''PTF analysis flow:
 1. legacypipe/cp_files.py -- copy all images want to analyze into path/to/images/
-2. this script -- make 1 directory in path/to/ for each _scie_,_mask_ pair with that dir's ccd.fits file only containing that one file, script also puts decals_dir, soft links, psfex, etc in each dir
-3. run tractor on all dir's pointing it to the decals_dir,output dir each time'''
+2. this script -- make 1 directory in path/to/ to write ccd.fits table for all images, decals_dir, soft links, psfex, etc
+3. run tractor on dir pointing it to the decals_dir,output dir each time'''
 
 
 import sys
@@ -148,82 +148,78 @@ def ptf_exposure_metadata(filenames, hdus=None, trim=None):
 
 scie_files= glob.glob(os.path.join(args.images_dir,'PTF*_scie_*.fits'))
 if len(scie_files) == 0: raise ValueError
-for full_fn in scie_files:
-    print 'making dir structure for:\n'
-    print os.path.basename(full_fn)
-    #make dir structure
-    fn= os.path.basename(full_fn)
-    ustr,field= fn[34:44],fn[49:56]
-    rootdir=os.path.join(args.images_dir,'../',field+'_'+ustr)
-    make_dir(rootdir)
-    #decal_dir
-    calib_dir= 'decals_dir/calib/ptf/'
-    for dn in [calib_dir+'se_config',calib_dir+'se',calib_dir+'psfex']: make_dir(os.path.join(rootdir,dn))
-    cmd= ' '.join(['cp',args.bricks_table,os.path.join(rootdir,'decals_dir/')])
+print 'making dir structure for all images'
+#make dir structure
+rootdir=os.path.join(args.images_dir,'../','all')
+make_dir(rootdir)
+#decal_dir
+calib_dir= 'decals_dir/calib/ptf/'
+for dn in [calib_dir+'se_config',calib_dir+'se',calib_dir+'psfex']: make_dir(os.path.join(rootdir,dn))
+cmd= ' '.join(['cp',args.bricks_table,os.path.join(rootdir,'decals_dir/')])
+if os.system(cmd): raise ValueError
+#soft link to images/
+home=os.getcwd()
+os.chdir(os.path.join(rootdir,'decals_dir/'))
+if not os.path.exists('images'):
+    cmd= ' '.join(['ln','-s','../../images/','images'])
     if os.system(cmd): raise ValueError
-    #soft link to images/
-    home=os.getcwd()
-    os.chdir(os.path.join(rootdir,'decals_dir/'))
-    if not os.path.exists('images'):
-        cmd= ' '.join(['ln','-s','../../images/','images'])
-        if os.system(cmd): raise ValueError
-    os.chdir(home)
-    print('made soft links')
-    #make ccd table
-    ccd_fname= os.path.join(rootdir,'decals_dir/','decals-ccds.fits')
-    if not os.path.exists(ccd_fname): 
-        T=ptf_exposure_metadata([full_fn])
-        T.writeto(ccd_fname)
-        print('Wrote ccd fits table, now SExtractor + PSFex')
-    #SExtractor, PSFex 
-    make_dir('junk') #need temp dir for mask-2 and invvar map
-    #[start,stop] files only
-    #subset= scie_files[args.start_stop[0]-1:args.start_stop[1]]
-    for cnt,imgfn in enumerate([full_fn]):
-        print('SExtractor,PSFex on %d of %d images' % (cnt,len([fn])))
-        #SExtractor
-        hdu=0
-        maskfn= imgfn.replace('_scie_','_mask_')
-        print('imgfn= ',imgfn)
-        invvar= read_invvar(imgfn,maskfn,hdu) #note, all post processing on image,mask done in read_invvar
-        mask= read_dq(maskfn,hdu)
-        maskfn= os.path.join('junk',os.path.basename(maskfn))
-        invvarfn= maskfn.replace('_mask_','_invvar_')
-        fitsio.write(maskfn, mask)
-        fitsio.write(invvarfn, invvar)
-        print('wrote mask-2 to %s, invvar to %s' % (maskfn,invvarfn))
-        #run se
-        magzp  = ptf_zeropoint(imgfn)
-        hdr=fitsio.read_header(imgfn,ext=hdu)
-        seeing = hdr['PIXSCALE'] * hdr['MEDFWHM']
-        gain= hdr['GAIN']
-        sefn= os.path.join(rootdir,calib_dir,'se/',os.path.basename(imgfn).replace('.fits','.se_cat'))
-        cmd = ' '.join(['sex','-c', os.path.join(args.configdir, 'DECaLS.se'),
-                        '-WEIGHT_IMAGE %s' % invvarfn, '-WEIGHT_TYPE MAP_WEIGHT',
-                        '-GAIN %f' % gain,
-                        '-FLAG_IMAGE %s' % maskfn,
-                        '-FLAG_TYPE OR',
-                        '-SEEING_FWHM %f' % seeing,
-                        '-DETECT_MINAREA 3',
-                        '-PARAMETERS_NAME', os.path.join(args.configdir, 'DECaLS.param'),
-                        '-FILTER_NAME', os.path.join(args.configdir, 'gauss_3.0_5x5.conv'),
-                        '-STARNNW_NAME', os.path.join(args.configdir, 'default.nnw'),
-                        '-PIXEL_SCALE 0',
-                        # SE has a *bizarre* notion of "sigma"
-                        '-DETECT_THRESH 1.0',
-                        '-ANALYSIS_THRESH 1.0',
-                        '-MAG_ZEROPOINT %f' % magzp,
-                        '-CATALOG_NAME', sefn,
-                        imgfn])
-        if os.system(cmd):
-            raise RuntimeError('Command failed: ' + cmd)
-        #PSFex
-        cmd= ' '.join(['psfex',sefn,'-c', os.path.join(args.configdir,'DECaLS.psfex'),
-                        '-PSF_DIR',os.path.join(rootdir,calib_dir,'psfex/')])
-        if os.system(cmd):
-            raise RuntimeError('Command failed: ' + cmd)                   
-        #delete temporary mask-2 and invvar
-        os.remove(maskfn)
-        os.remove(invvarfn)
-    print('finished dir: %s' % rootdir)
+os.chdir(home)
+print('made soft links')
+#make ccd table
+ccd_fname= os.path.join(rootdir,'decals_dir/','decals-ccds.fits')
+if not os.path.exists(ccd_fname): 
+    T=ptf_exposure_metadata(scie_files)
+    T.writeto(ccd_fname)
+    print('Wrote ccd fits table, now SExtractor + PSFex')
+#SExtractor, PSFex 
+make_dir('junk') #need temp dir for mask-2 and invvar map
+#[start,stop] files only
+#subset= scie_files[args.start_stop[0]-1:args.start_stop[1]]
+for cnt,imgfn in enumerate(scie_files):
+    print('SExtractor,PSFex on %d of %d images' % (cnt,len(scie_files)))
+    #SExtractor
+    hdu=0
+    maskfn= imgfn.replace('_scie_','_mask_')
+    print('imgfn= ',imgfn)
+    invvar= read_invvar(imgfn,maskfn,hdu) #note, all post processing on image,mask done in read_invvar
+    mask= read_dq(maskfn,hdu)
+    maskfn= os.path.join('junk',os.path.basename(maskfn))
+    invvarfn= maskfn.replace('_mask_','_invvar_')
+    fitsio.write(maskfn, mask)
+    fitsio.write(invvarfn, invvar)
+    print('wrote mask-2 to %s, invvar to %s' % (maskfn,invvarfn))
+    #run se
+    magzp  = ptf_zeropoint(imgfn)
+    hdr=fitsio.read_header(imgfn,ext=hdu)
+    seeing = hdr['PIXSCALE'] * hdr['MEDFWHM']
+    gain= hdr['GAIN']
+    sefn= os.path.join(rootdir,calib_dir,'se/',os.path.basename(imgfn).replace('.fits','.se_cat'))
+    cmd = ' '.join(['sex','-c', os.path.join(args.configdir, 'DECaLS.se'),
+                    '-WEIGHT_IMAGE %s' % invvarfn, '-WEIGHT_TYPE MAP_WEIGHT',
+                    '-GAIN %f' % gain,
+                    '-FLAG_IMAGE %s' % maskfn,
+                    '-FLAG_TYPE OR',
+                    '-SEEING_FWHM %f' % seeing,
+                    '-DETECT_MINAREA 3',
+                    '-PARAMETERS_NAME', os.path.join(args.configdir, 'DECaLS.param'),
+                    '-FILTER_NAME', os.path.join(args.configdir, 'gauss_3.0_5x5.conv'),
+                    '-STARNNW_NAME', os.path.join(args.configdir, 'default.nnw'),
+                    '-PIXEL_SCALE 0',
+                    # SE has a *bizarre* notion of "sigma"
+                    '-DETECT_THRESH 1.0',
+                    '-ANALYSIS_THRESH 1.0',
+                    '-MAG_ZEROPOINT %f' % magzp,
+                    '-CATALOG_NAME', sefn,
+                    imgfn])
+    if os.system(cmd):
+        raise RuntimeError('Command failed: ' + cmd)
+    #PSFex
+    cmd= ' '.join(['psfex',sefn,'-c', os.path.join(args.configdir,'DECaLS.psfex'),
+                    '-PSF_DIR',os.path.join(rootdir,calib_dir,'psfex/')])
+    if os.system(cmd):
+        raise RuntimeError('Command failed: ' + cmd)                   
+    #delete temporary mask-2 and invvar
+    os.remove(maskfn)
+    os.remove(invvarfn)
+print('finished dir: %s' % rootdir)
 print('done')
