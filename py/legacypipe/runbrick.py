@@ -3560,7 +3560,7 @@ def _one_blob(X):
             tmp_cnt=0
             for imod,modname in enumerate(mods.keys()):
 
-                if mod != 'none' and not modname in chisqs:
+                if modname != 'none' and not modname in chisqs:
                     continue
 
                 srccat[0] = mods[modname]
