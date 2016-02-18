@@ -6,6 +6,8 @@ from astrometry.util.fits import fits_table
 from tractor.basics import PointSource, RaDecPos, NanoMaggies
 from .common import tim_get_resamp
 
+from thesis_code.bash import do_bash
+
 def _detmap(X):
     from scipy.ndimage.filters import gaussian_filter
     (tim, targetwcs, H, W) = X
@@ -605,6 +607,11 @@ def sed_matched_detection(sedname, sed, detmaps, detivs, bands,
         plt.title('SED %s: hot blobs' % sedname)
         plt.figlegend((p3[0],p1[0],p2[0]), ('Existing', 'Keep', 'Drop'),
                       'upper left')
-        plt.savefig('./sedmap_%s.png' % sedname)
+        #crazy! ps.outdir is not known here yet it is in all stages!
+        #output SED pngs with current time so can later see which belongs to which
+        #plt.savefig(os.path.join(ps.outdir,'sedmap_%s.png' % sedname))
+        cpudate= do_bash("date")
+        cpudate= cpudate[cpudate.find(':')-2:].replace(' ','').strip().replace(':','-')
+        plt.savefig('./sedmap_%s_%s.png' % (sedname,cpudate))
      
     return hotblobs, px, py, aper, peakval

@@ -1433,7 +1433,6 @@ def stage_srcs(coimgs=None, cons=None,
             plt.subplot(1,2,2)
             dimshow(subbed, **kwa)
             plt.title('detmap w/median filter')
-            print('<<<<<<<<<<<<< ps.poutdir=',ps.outdir)
             plt.savefig(os.path.join(ps.outdir,'detmap_%s.png' % bands[i]))
 
     # Handle the margin of interpolated (masked) pixels around
@@ -3629,7 +3628,6 @@ def _one_blob(X):
             title='MODEL=%s, %s\n' %(keepmod,str(src))
             plt.suptitle(title+l1+l2+l3+l4, fontsize=8)
             plt.subplots_adjust(hspace=0)
-            print('<<<<<<<<<<<<< ps.poutdir=',ps.outdir)
             plt.savefig(os.path.join(ps.outdir,'Blob_%i_source_%i.png' % (iblob, i)))
 
         B.dchisqs[i, :] = np.array([chisqs.get(k,0) for k in modnames])
