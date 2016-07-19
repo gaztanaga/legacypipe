@@ -28,19 +28,19 @@ def bin_up(data_bin_by,data_for_percentile, bin_minmax=(18.,26.),nbins=20):
     returns bin center,N,q25,50,75 for each bin
     '''
     bin_edges= np.linspace(bin_minmax[0],bin_minmax[1],num= nbins+1)
-    N= np.zeros(nbins)+np.nan
-    q25,q50,q75= N.copy(),N.copy(),N.copy()
-    for i,low,hi in zip(range(nbins-1), bin_edges[:-1],bin_edges[1:]):
-        keep= np.all((low <= data_bin_by,data_bin_by < hi),axis=0)
+    vals={}
+    for key in ['q50','q25','q75','n']: vals[key]=np.zeros(nbins)+np.nan
+    vals['binc']= (bin_edges[1:]+bin_edges[:-1])/2.
+    for i,low,hi in zip(range(nbins), bin_edges[:-1],bin_edges[1:]):
+        keep= np.all((low < data_bin_by,data_bin_by <= hi),axis=0)
         if np.where(keep)[0].size > 0:
-            N[i]= np.where(keep)[0].size
-            q25[i]= np.percentile(data_for_percentile[keep],q=25)
-            q50[i]= np.percentile(data_for_percentile[keep],q=50)
-            q75[i]= np.percentile(data_for_percentile[keep],q=75)
+            vals['n'][i]= np.where(keep)[0].size
+            vals['q25'][i]= np.percentile(data_for_percentile[keep],q=25)
+            vals['q50'][i]= np.percentile(data_for_percentile[keep],q=50)
+            vals['q75'][i]= np.percentile(data_for_percentile[keep],q=75)
         else:
-            # already initialized to nan
-            pass
-    return (bin_edges[1:]+bin_edges[:-1])/2.,N,q25,q50,q75
+            vals['n'][i]=0 
+    return vals
 
 # Main plotting functions 
 def nobs(obj, name=''):
@@ -99,9 +99,7 @@ def sn_vs_mag(obj, mag_minmax=(18.,26.),name=''):
     # Bin up SN values
     bin_SN={}
     for band,iband in zip(['g','r','z'],[1,2,4]):
-        bin_SN[band]={}
-        bin_SN[band]['binc'],N,bin_SN[band]['q25'],bin_SN[band]['q50'],bin_SN[band]['q75']=\
-                bin_up(obj.t['decam_mag'][:,iband], \
+        bin_SN[band]= bin_up(obj.t['decam_mag'][:,iband], \
                        obj.t['decam_flux'][:,iband]*np.sqrt(obj.t['decam_flux_ivar'][:,iband]),\
                        bin_minmax=mag_minmax)
     #setup plot
