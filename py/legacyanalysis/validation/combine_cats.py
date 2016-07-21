@@ -20,7 +20,6 @@ import numpy as np
 
 from astropy.io import fits
 from astropy.table import vstack, Table, Column
-#from scipy.spatial import KDTree
 from astrometry.libkd.spherematch import match_radec
 
 from legacyanalysis.validation.pathnames import get_outdir
@@ -37,23 +36,6 @@ def deg2_lower_limit(ra,dec):
     assert(ra_wid > 0.)
     dec_wid= abs(dec.max()-dec.min())
     return ra_wid*dec_wid
-
-def kdtree_match(ref_ra,ref_dec, ra,dec, k=1, dsmax=1./3600):
-    '''finds approx. distance between reference and test points and
-    returns array of indices and distance where distance < dsmax (degrees)
-    '''
-    assert(len(ref_ra) == len(ref_dec))
-    assert(len(ra) == len(dec))
-    # Index the tree
-    tree = KDTree(np.transpose([dec.copy(),ra.copy()])) 
-    # Find the k nearest neighbors to each reference ra,dec
-    ds, i_tree = tree.query(np.transpose([ref_dec.copy(),ref_ra.copy()]), k=k) 
-    # Get indices where match
-    i_ref,i_other={},{}
-    ref_match= np.arange(len(ref_ra))[ds<=dsmax]
-    other_match= i_tree[ds<=dsmax]
-    assert(len(ref_ra[ref_match]) == len(ra[other_match]))
-    return np.array(ref_match),np.array(other_match),np.array(ds[ds<=dsmax])
 
 def combine_cats(cat_list, debug=False):
     '''return dict containing astropy Table of concatenated tractor cats'''
@@ -75,71 +57,9 @@ def combine_cats(cat_list, debug=False):
             bigtractor = tractor
         else:
             bigtractor = vstack((bigtractor, tractor), metadata_conflicts='error')
-        deg2+= deg2_lower_limit(tractor['ra'],tractor['dec'])
-    
+        deg2+= deg2_lower_limit(tractor['ra'],tractor['dec'])    
     return bigtractor, dict(deg2=deg2)
 
-
-def match_two_cats(ref_cats_file,test_cats_file, debug=False):
-    '''return dict containing astropy Table of concatenated tractor cats
-    one Table for matched and missed reference and test objects, each'''
-    # Set the debugging level
-    lvl = logging.INFO
-    logging.basicConfig(format='%(message)s', level=lvl, stream=sys.stdout)
-    log = logging.getLogger('__name__')
-
-    #get lists of tractor cats to compare
-    fns_1= read_lines(ref_cats_file) 
-    fns_2= read_lines(test_cats_file) 
-    print('Comparing tractor catalogues: ')
-    for one,two in zip(fns_1,fns_2): print("%s -- %s" % (one,two)) 
-    #if fns_1.size == 1: fns_1,fns_2= [fns_1],[fns_2]
-    #object to store concatenated matched tractor cats
-    ref_matched = []
-    ref_missed = []
-    test_matched = []
-    test_missed = []
-    d_matched= 0.
-    deg2= dict(ref=0.,test=0.,matched=0.)
-    # One catalogue for quick debugging
-    if debug: fns_1,fns_2= fns_1[:1],fns_2[:1]
-    # Loop over cats
-    for cnt,cat1,cat2 in zip(range(len(fns_1)),fns_1,fns_2):
-        print('Reading %s -- %s' % (cat1,cat2))
-        ref_tractor = Table(fits.getdata(cat1, 1), masked=True)
-        test_tractor = Table(fits.getdata(cat2, 1), masked=True)
-        m1, m2, d12 = match_radec(ref_tractor['ra'].data.copy(), ref_tractor['dec'].data.copy(),\
-                                  test_tractor['ra'].data.copy(), test_tractor['dec'].data.copy(), \
-                                  1.0/3600.0)
-        #m1, m2, d12= kdtree_match(ref_tractor['ra'].copy(), ref_tractor['dec'].copy(),\
-        #                          test_tractor['ra'].copy(), test_tractor['dec'].copy(),\
-        #                          k=1, dsmax=1./3600)
-        print("Matched: %d/%d objects" % (m1.size,len(ref_tractor['ra'])))
-        miss1 = np.delete(np.arange(len(ref_tractor)), m1, axis=0)
-        miss2 = np.delete(np.arange(len(test_tractor)), m2, axis=0)
-
-        # Build combined catalogs
-        if len(ref_matched) == 0:
-            ref_matched = ref_tractor[m1]
-            ref_missed = ref_tractor[miss1]
-            test_matched = test_tractor[m2]
-            test_missed = test_tractor[miss2]
-            d_matched= d12
-        else:
-            ref_matched = vstack((ref_matched, ref_tractor[m1]), metadata_conflicts='error')
-            ref_missed = vstack((ref_missed, ref_tractor[miss1]), metadata_conflicts='error')
-            test_matched = vstack((test_matched, test_tractor[m2]), metadata_conflicts='error')
-            test_missed = vstack((test_missed, test_tractor[miss2]), metadata_conflicts='error')
-            d_matched= np.concatenate([d_matched, d12])
-        deg2['ref']+= deg2_lower_limit(ref_tractor['ra'],ref_tractor['dec'])
-        deg2['test']+= deg2_lower_limit(test_tractor['ra'],test_tractor['dec'])
-        deg2['matched']+= deg2_lower_limit(ref_matched['ra'],ref_matched['dec'])
-    
-    return dict(ref_matched = ref_matched,
-                ref_missed = ref_missed,
-                test_matched = test_matched,
-                test_missed = test_missed), \
-           dict(d_matched= d_matched, deg2= deg2)
 
 class Single_DataSet(object):
     '''Has five things:
@@ -153,7 +73,7 @@ class Single_DataSet(object):
         # Store tractor catalogue as astropy Table
         self.tractor, self.meta= combine_cats(cat_list, debug=debug)
         self.clean_up()
-        self.more= self.get_more_table()
+        self.more= self.get_more()
         self.keep= self.get_keep_dict()
         # Initialize without cuts
         # Creates self.t,self.m tables
@@ -165,10 +85,11 @@ class Single_DataSet(object):
         # "PSF" not 'PSF '
         self.tractor['type']= np.char.strip(self.tractor['type']) 
         
-    def get_more_table(self):
+    def get_more(self):
         # AB Mags
         mag= self.get_magAB()
         mag_ivar= self.get_magAB_ivar()
+        return Table([mag, mag_ivar], names=('mag', 'mag_ivar'))
     
     def get_magAB(self):
         mag= self.tractor['decam_flux']/self.tractor['decam_mw_transmission']
@@ -252,7 +173,12 @@ class Matched_DataSet(object):
         # Combine catalogues and get all info could possibly need
         self.ref= Single_DataSet(ref_cats_file, comparison=comparison,debug=debug)
         self.test= Single_DataSet(test_cats_file, comparison=comparison,debug=debug)
-        # Match
+        # Matching indices, as dict of boolean arrays
+        self.m_dict= self.do_matching()
+
+    def do_matching(self):
+        '''matches test ra,dec to ref ra,dec
+        Returns dict of boolean arrays for the matched and missed samples'''    
         m1, m2, d12 = match_radec(self.ref.tractor['ra'].data.copy(), self.ref.tractor['dec'].data.copy(),\
                                   self.test.tractor['ra'].data.copy(), self.test.tractor['dec'].data.copy(),\
                                   1.0/3600.0)
@@ -260,24 +186,31 @@ class Matched_DataSet(object):
         miss1 = np.delete(np.arange(len(self.ref.tractor)), m1, axis=0)
         miss2 = np.delete(np.arange(len(self.test.tractor)), m2, axis=0)
         # Indices to bool array
-        self.keep= dict(ref_match= self.indices2bool(m1,size=len(self.ref.tractor)),\
-                        ref_miss= self.indices2bool(miss1,size=len(self.ref.tractor),\
-                        test_match= self.indices2bool(m2,size=len(self.test.tractor),\
-                        test_miss= self.indices2bool(miss2,size=len(self.test.tractor))
-        # Use Matched by default 
-        self.select('matched')
-        
-    def select(name):
-        assert(name == 'matched' or name == 'missed')
-        if name == 'matched':
-            self.ref.keep['permanent']= self.keep['ref_match']
-            self.test.keep['permanent']= self.keep['test_match']
-        elif name == 'matched':
-            self.ref.keep['permanent']= self.keep['ref_miss']
-            self.test.keep['permanent']= self.keep['test_miss']
+        ref_rows= len(self.ref.tractor)
+        test_rows= len(self.test.tractor)
+        return dict(ref_match= self.indices2bool(m1,rows=ref_rows),\
+                    ref_miss= self.indices2bool(miss1,rows=ref_rows),\
+                    test_match= self.indices2bool(m2,rows=test_rows),\
+                    test_miss= self.indices2bool(miss2,rows=test_rows))
 
-    def indices2bool(self,indices,size):
-        '''return boolean array of len size corresponding to indices of an array of len size'''
-        b_arr= np.zeros(size).astype(bool)
+    def indices2bool(self,indices,rows=None):
+        '''convert indices for an array into boolean array of same length as array'''
+        assert(rows is not None)
+        b_arr= np.zeros(rows).astype(bool)
         b_arr[indices]= True
         return b_arr
+ 
+    def use_matched(self):
+        self.ref.keep['permanent']= self.keep['ref_match']
+        self.test.keep['permanent']= self.keep['test_match']
+    
+    def use_missed(self):
+        self.ref.keep['permanent']= self.keep['ref_miss']
+        self.test.keep['permanent']= self.keep['test_miss']
+          
+    def select(self,keep_list):
+        '''select keys in keep_list from ref and test data sets'''
+        self.ref.select(keep_list)
+        self.test.select(keep_list)
+
+

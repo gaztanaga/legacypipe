@@ -25,8 +25,12 @@ args = parser.parse_args()
 
 # Get data
 d= Matched_DataSet(args.decals_list, args.bassmos_list, \
-                   comparison='test')
-# Plots
+                   comparison='test',debug=True)
+# Matched sources, all 
+d.use('matched')
+d.select('all')
+
+#
 plots.nobs(d.ref_matched, name='DECaLS')
 plots.nobs(d.test_matched, name='BASS_MzLS')
 plots.radec(d.ref_matched, name='Matched')
