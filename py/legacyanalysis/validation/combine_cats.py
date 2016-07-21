@@ -55,17 +55,12 @@ def kdtree_match(ref_ra,ref_dec, ra,dec, k=1, dsmax=1./3600):
     assert(len(ref_ra[ref_match]) == len(ra[other_match]))
     return np.array(ref_match),np.array(other_match),np.array(ds[ds<=dsmax])
 
-def combine_single_cats(cat_list, debug=False):
+def combine_cats(cat_list, debug=False):
     '''return dict containing astropy Table of concatenated tractor cats'''
-    # Set the debugging level
-    lvl = logging.INFO
-    logging.basicConfig(format='%(message)s', level=lvl, stream=sys.stdout)
-    log = logging.getLogger('__name__')
-
     #get lists of tractor cats to compare
     fns= read_lines(ref_cats_file) 
-    log.info('Combining tractor catalogues: ')
-    for fn in fns: log.info("%s" % fn) 
+    print('Combining tractor catalogues: ')
+    for fn in fns: print("%s" % fn) 
     #object to store concatenated matched tractor cats
     bigtractor = []
     deg2= 0.
@@ -73,7 +68,7 @@ def combine_single_cats(cat_list, debug=False):
     if debug: fns= fns[:1]
     # Loop over cats
     for cnt,fn in zip(range(len(fns)),fns):
-        log.info('Reading %s' % fn)
+        print('Reading %s' % fn)
         tractor = Table(fits.getdata(fn, 1), masked=True)
         # Build combined catalogs
         if len(bigtractor) == 0:
@@ -96,8 +91,8 @@ def match_two_cats(ref_cats_file,test_cats_file, debug=False):
     #get lists of tractor cats to compare
     fns_1= read_lines(ref_cats_file) 
     fns_2= read_lines(test_cats_file) 
-    log.info('Comparing tractor catalogues: ')
-    for one,two in zip(fns_1,fns_2): log.info("%s -- %s" % (one,two)) 
+    print('Comparing tractor catalogues: ')
+    for one,two in zip(fns_1,fns_2): print("%s -- %s" % (one,two)) 
     #if fns_1.size == 1: fns_1,fns_2= [fns_1],[fns_2]
     #object to store concatenated matched tractor cats
     ref_matched = []
@@ -110,7 +105,7 @@ def match_two_cats(ref_cats_file,test_cats_file, debug=False):
     if debug: fns_1,fns_2= fns_1[:1],fns_2[:1]
     # Loop over cats
     for cnt,cat1,cat2 in zip(range(len(fns_1)),fns_1,fns_2):
-        log.info('Reading %s -- %s' % (cat1,cat2))
+        print('Reading %s -- %s' % (cat1,cat2))
         ref_tractor = Table(fits.getdata(cat1, 1), masked=True)
         test_tractor = Table(fits.getdata(cat2, 1), masked=True)
         m1, m2, d12 = match_radec(ref_tractor['ra'].data.copy(), ref_tractor['dec'].data.copy(),\
@@ -146,125 +141,143 @@ def match_two_cats(ref_cats_file,test_cats_file, debug=False):
                 test_missed = test_missed), \
            dict(d_matched= d_matched, deg2= deg2)
 
-class Single_TractorCat(object):
-    '''given a astropy table of a Tractor Catalogue, this object computes
-    everything you could need to know for the Tractor Catalogue'''
-    def __init__(self,astropy_t, comparison='test'):
-        self.t= astropy_t
-        # clean up fields, e.g. type = 'PSF' instead of 'PSF '
-        self.t['type']= np.char.strip(self.t['type']) 
-        # outdir for when making plots
+class Single_DataSet(object):
+    '''Has five things:
+    1) self.tractor -- astropy table
+    2) self.more -- astropy table with additional info e.g. decam_mag, decam_mag_ivar etc
+    3) Select -- dict of indices for subsets of data, e.g. PSF
+    4) self.t, self.m -- subset astropy tables of self.tractor, self.more using Select()
+    and supporting functions
+    '''
+    def __init__(self,cat_list, comparison='test',debug=False):
+        # Store tractor catalogue as astropy Table
+        self.tractor, self.meta= combine_cats(cat_list, debug=debug)
+        self.clean_up()
+        self.more= self.get_more_table()
+        self.keep= self.get_keep_dict()
+        # Initialize without cuts
+        # Creates self.t,self.m tables
+        self.select(['all'])
+        # Outdir for plots
         self.outdir= get_outdir(comparison)
-        # AB Mags
-        self.get_magAB()
-        self.get_magAB_ivar()
-        # Masks (True where mask OUT values)
-        self.masks= dict(default= self.basic_cuts(),\
-                         all= np.zeros(len(self.t['ra'])).astype(bool),\
-                         psf= self.cut_on_type('PSF'),\
-                         simp= self.cut_on_type('SIMP'),\
-                         exp= self.cut_on_type('EXP'),\
-                         dev= self.cut_on_type('DEV'),\
-                         comp= self.cut_on_type('COMP'),\
-                         extended= self.cut_on_type('EXTENDED'))
-        # Initialize with default mask
-        self.apply_mask_by_names(['default'])
-        # Target selection
-        #self.targets= self.get_TargetSelectin(data)
 
+    def clean_up(self):
+        # "PSF" not 'PSF '
+        self.tractor['type']= np.char.strip(self.tractor['type']) 
+        
+    def get_more_table(self):
+        # AB Mags
+        mag= self.get_magAB()
+        mag_ivar= self.get_magAB_ivar()
+    
     def get_magAB(self):
-        self.t['decam_mag']= self.t['decam_flux']/self.t['decam_mw_transmission']
-        self.t['decam_mag']= 22.5 -2.5*np.log10(self.t['decam_mag'])
+        mag= self.tractor['decam_flux']/self.tractor['decam_mw_transmission']
+        return 22.5 -2.5*np.log10(mag)
 
     def get_magAB_ivar(self):
-        self.t['decam_mag_ivar']= np.power(np.log(10.)/2.5*self.t['decam_flux'], 2)* \
-                                 self.t['decam_flux_ivar']
+        return np.power(np.log(10.)/2.5*self.tractor['decam_flux'], 2)* \
+                                    self.tractor['decam_flux_ivar']
  
+    def get_keep_dict(self):
+        '''permanent -- a special key in the "keep" dict which is always used if set, default="all"
+        current -- the currently set boolean array, self.select() sets self.keep["current"] to what you want
+        all other keys only used when explicitly set with "self.select(key_name)"'''
+        # True where want to keep
+        return dict(permanent= np.ones(len(self.tractor)).astype(bool),\
+                    current= np.ones(len(self.tractor)).astype(bool),\
+                    default= self.basic_cuts(),\
+                    all= np.ones(len(self.tractor)).astype(bool),\
+                    psf= self.tractor['type'].data == 'PSF',\
+                    simp= self.tractor['type'].data == 'SIMP',\
+                    exp= self.tractor['type'].data == 'EXP',\
+                    dev= self.tractor['type'].data == 'DEV',\
+                    comp= self.tractor['type'].data == 'COMP',\
+                    extended= self.tractor['type'].data != 'PSF')
+        #self.targets= self.get_TargetSelectin(data)
+
     def basic_cuts(self): 
-        '''True where BAD, return boolean array'''
-        return  np.any((self.t['decam_flux'].data[:,1] < 0,\
-                        self.t['decam_flux'].data[:,2] < 0,\
-                        self.t['decam_flux'].data[:,4] < 0, \
-                        self.t['decam_anymask'].data[:,1] != 0,\
-                        self.t['decam_anymask'].data[:,2] != 0,\
-                        self.t['decam_anymask'].data[:,4] != 0,\
-                        self.t['decam_fracflux'].data[:,1] > 0.05,\
-                        self.t['decam_fracflux'].data[:,2] > 0.05,\
-                        self.t['decam_fracflux'].data[:,4] > 0.05,\
-                        self.t['brick_primary'].data == False),axis=0)
+        return  np.any((self.t['decam_flux'].data[:,1] > 0,\
+                        self.t['decam_flux'].data[:,2] > 0,\
+                        self.t['decam_flux'].data[:,4] > 0, \
+                        self.t['decam_anymask'].data[:,1] == 0,\
+                        self.t['decam_anymask'].data[:,2] == 0,\
+                        self.t['decam_anymask'].data[:,4] == 0,\
+                        self.t['decam_fracflux'].data[:,1] <= 0.05,\
+                        self.t['decam_fracflux'].data[:,2] <= 0.05,\
+                        self.t['decam_fracflux'].data[:,4] <= 0.05,\
+                        self.t['brick_primary'].data == True),axis=0)
 
-    def apply_boolean_mask(self, mask):
-        '''set each Column's mask to specified mask'''
-        # Tell masks dict what that this is the new current mask
-        self.masks['current']= mask
-        for key in self.t.keys(): self.t[key].mask= self.masks['current']
+    def select(self,keep_list):
+        '''keep_list -- list of names from "keep" dict to use as a subset
+        permanent -- a special key in the "keep" dict which is always used if set, default="all"'''
+        # Add permanent to list
+        keep_list+= ['permanent'] 
+        for name in list_of_names: assert(name in self.keep.keys())
+        # Union
+        keep= self.keep[keep_list[0]]
+        if len(keep_list) > 1:
+            for i,name in enumerate(keep_list[1:]): 
+                keep= np.all((keep, self.keep[name]), axis=0)
+        # Apply
+        self.apply_selection(keep)
 
-    def add_to_current_mask(self,newmask):
-        '''mask additional pixels to current mask'''
-        assert(self.masks is not None)
-        mask= np.any((self.masks['current'],newmask), axis=0)
-        self.apply_boolean_mask(mask)
-
-    def combine_mask_by_names(self,list_of_names):
-        '''return boolean union of all masks in "list_of_names"'''
-        assert(self.masks is not None)
-        for name in list_of_names: assert(name in self.masks.keys())
-        # return union
-        mask= self.masks[list_of_names[0]]
-        if len(list_of_names) > 1:
-            for i,name in enumerate(list_of_names[1:]): 
-                mask= np.any((mask, self.masks[name]), axis=0)
-        return mask
-
-    def apply_mask_by_names(self,list_of_names):
-        '''set mask to union of masks in "list of names"'''
-        union= self.combine_mask_by_names(list_of_names)
-        self.apply_boolean_mask(union)
-
-    def number_not_masked(self,list_of_names):
-        '''for mask being union of "list of names", 
-        returns number object not masked out 
-        example -- n_psf= self.number_masked(['psf'])'''
-        union= self.combine_mask_by_names(list_of_names)
-        # Where NOT masked out
-        return np.where(union == False)[0].size
+    def select_my_own(self, my_b_arr):
+        '''keep your own boolean array'''
+        # Add permanent to list
+        keep= np.all((my_b_arr, self.keep['permanent']), axis=0)
+        # Apply
+        self.apply_selection(keep)
     
-    def cut_on_type(self,name):
-        '''True where BAD, return boolean array'''
-        # Return boolean array
-        if name in ['PSF','SIMP','EXP','DEV','COMP']:
-            keep= self.t['type'].data == name
-        elif name == 'EXTENDED':
-            keep= self.t['type'].data != 'PSF'
-        else: raise ValueError
-        return keep == False
+    def apply_selection(self,b_arr):
+        self.keep['current']= b_arr
+        self.t= self.tractor[b_arr] 
+        self.o= self.tractor[b_arr] 
 
+    def number_kept(self):
+        return len(self.t)
     #def get_TargetSelectin(self, data):
     ##### store as self.t.masks['elg'], self.t.masks['lrg'], etc
     #    d={}
-    #    d['desi_target'], d['bgs_target'], d['mws_target']= \
+    #e    d['desi_target'], d['bgs_target'], d['mws_target']= \
     #                    cuts.apply_cuts( data )
     #    return d
 
-    
+ 
 
-class Single_DataSet(object):
-    '''a Single_DataSet contains a concatenated tractor catalogue as Astropy table
-    with additional columns for mags, masks, target selection, etc'''
-    def __init__(self,cat_list, comparison='test',debug=False):
-        # Store tractor catalogue as astropy Table
-        astropy_t, self.meta= combine_single_cats(cat_list, debug=debug)
-        self.single= Single_TractorCat(astropy_t, comparison)
 
 class Matched_DataSet(object):
     '''a Matched_DataSet contains a dict of 4 concatenated, matched, tractor catalogue astropy Tables
     each table has additional columns for mags, target selection, masks, etc.'''
     def __init__(self,ref_cats_file,test_cats_file, comparison='test',debug=False):
-        astropy_ts, self.meta= match_two_cats(ref_cats_file,test_cats_file, debug=debug)
-        # have 4 tractor catalogues
-        self.ref_matched= Single_TractorCat(astropy_ts['ref_matched'], comparison)
-        self.test_matched= Single_TractorCat(astropy_ts['test_matched'], comparison)
-        self.ref_missed= Single_TractorCat(astropy_ts['ref_missed'], comparison)
-        self.test_missed= Single_TractorCat(astropy_ts['test_missed'], comparison) 
+        # Combine catalogues and get all info could possibly need
+        self.ref= Single_DataSet(ref_cats_file, comparison=comparison,debug=debug)
+        self.test= Single_DataSet(test_cats_file, comparison=comparison,debug=debug)
+        # Match
+        m1, m2, d12 = match_radec(self.ref.tractor['ra'].data.copy(), self.ref.tractor['dec'].data.copy(),\
+                                  self.test.tractor['ra'].data.copy(), self.test.tractor['dec'].data.copy(),\
+                                  1.0/3600.0)
+        print("Matched: %d/%d objects" % (m1.size,len(self.ref.tractor)))
+        miss1 = np.delete(np.arange(len(self.ref.tractor)), m1, axis=0)
+        miss2 = np.delete(np.arange(len(self.test.tractor)), m2, axis=0)
+        # Indices to bool array
+        self.keep= dict(ref_match= self.indices2bool(m1,size=len(self.ref.tractor)),\
+                        ref_miss= self.indices2bool(miss1,size=len(self.ref.tractor),\
+                        test_match= self.indices2bool(m2,size=len(self.test.tractor),\
+                        test_miss= self.indices2bool(miss2,size=len(self.test.tractor))
+        # Use Matched by default 
+        self.select('matched')
+        
+    def select(name):
+        assert(name == 'matched' or name == 'missed')
+        if name == 'matched':
+            self.ref.keep['permanent']= self.keep['ref_match']
+            self.test.keep['permanent']= self.keep['test_match']
+        elif name == 'matched':
+            self.ref.keep['permanent']= self.keep['ref_miss']
+            self.test.keep['permanent']= self.keep['test_miss']
 
-
+    def indices2bool(self,indices,size):
+        '''return boolean array of len size corresponding to indices of an array of len size'''
+        b_arr= np.zeros(size).astype(bool)
+        b_arr[indices]= True
+        return b_arr
