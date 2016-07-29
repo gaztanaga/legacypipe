@@ -39,8 +39,7 @@ def deg2_lower_limit(ra,dec):
 
 def combine_cats(cat_list, debug=False):
     '''return dict containing astropy Table of concatenated tractor cats'''
-    #get lists of tractor cats to compare
-    fns= read_lines(ref_cats_file) 
+    fns= read_lines(cat_list) 
     print('Combining tractor catalogues: ')
     for fn in fns: print("%s" % fn) 
     #object to store concatenated matched tractor cats
@@ -116,35 +115,33 @@ class Single_DataSet(object):
         #self.targets= self.get_TargetSelectin(data)
 
     def clean_cut(self): 
-        return  np.any((self.t['decam_flux'].data[:,1] > 0,\
-                        self.t['decam_flux'].data[:,2] > 0,\
-                        self.t['decam_flux'].data[:,4] > 0, \
-                        self.t['decam_anymask'].data[:,1] == 0,\
-                        self.t['decam_anymask'].data[:,2] == 0,\
-                        self.t['decam_anymask'].data[:,4] == 0,\
-                        self.t['decam_fracflux'].data[:,1] <= 0.05,\
-                        self.t['decam_fracflux'].data[:,2] <= 0.05,\
-                        self.t['decam_fracflux'].data[:,4] <= 0.05,\
-                        self.t['brick_primary'].data == True),axis=0)
+        return  np.any((self.tractor['decam_flux'].data[:,1] > 0,\
+                        self.tractor['decam_flux'].data[:,2] > 0,\
+                        self.tractor['decam_flux'].data[:,4] > 0, \
+                        self.tractor['decam_anymask'].data[:,1] == 0,\
+                        self.tractor['decam_anymask'].data[:,2] == 0,\
+                        self.tractor['decam_anymask'].data[:,4] == 0,\
+                        self.tractor['decam_fracflux'].data[:,1] <= 0.05,\
+                        self.tractor['decam_fracflux'].data[:,2] <= 0.05,\
+                        self.tractor['decam_fracflux'].data[:,4] <= 0.05,\
+                        self.tractor['brick_primary'].data == True),axis=0)
 
-    def get_cut(self,keep_list):
-        '''keep_list -- list of names from "keep" dict to use as a subset
+    def get_cut(self,list_of_names):
+        '''list_of_names -- keys from b_arrays dict use as a subset
         return boolean array to be used for cut'''
         # Check that keep_list is a list
-        assert("<type 'list'>" == repr(type(keep_list)))
-        # Name must exist in b_arrays dict
-        for name in list_of_names: assert(name in self.b_arrays.keys())
+        assert("<type 'list'>" == repr(type(list_of_names)))
         # Union of cuts
-        keep= self.b_arrays[keep_list[0]]
-        if len(keep_list) > 1:
-            for i,name in enumerate(keep_list[1:]): 
+        keep= self.b_arrays[list_of_names[0]]
+        if len(list_of_names) > 1:
+            for i,name in enumerate(list_of_names[1:]): 
                 keep= np.all((keep, self.b_arrays[name]), axis=0)
         return keep
     
-    def apply_cut(self,keep_list):
+    def apply_cut(self,list_of_names):
         '''cut astropy tables to keep_list bool arrays, store in 
         self.data'''
-        keep= self.get_cut(keep_list)
+        keep= self.get_cut(list_of_names)
         self.data['tractor']= self.tractor[keep] 
         self.data['extra']= self.extra[keep] 
 
@@ -152,7 +149,7 @@ class Single_DataSet(object):
         '''add "name" to self.b_arrays dictionary'''
         assert(name is not None and b_array is not None)
         if name in self.b_arrays.keys(): 
-            print "choose a different name for %s, already in self.b_arrays.keys()", % name
+            print("choose a different name for %s, already in self.b_arrays.keys()" % name)
             raise ValueError
         self.b_arrays['name'] = b_array
     
