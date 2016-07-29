@@ -70,14 +70,16 @@ class Single_DataSet(object):
     and supporting functions
     '''
     def __init__(self,cat_list, comparison='test',debug=False):
-        # Store tractor catalogue as astropy Table
+        # Store tractor catalogue and extra data from it as two astropy Tables
         self.tractor, self.meta= combine_cats(cat_list, debug=debug)
         self.clean_up()
-        self.more= self.get_more()
-        self.keep= self.get_keep_dict()
-        # Initialize without cuts
-        # Creates self.t,self.m tables
-        self.select(['all'])
+        self.extra= self.get_extra_data()
+        # Dict of boolean arrays to filter on
+        self.b_arrays= self.get_keep_dict()
+        # Dict to hold cut astropy tables
+        self.data= dict(tractor=None,extra=None)
+        # Initialize without cuts, Creates self.data dict which has 'tractor','extra' cut astropy tables
+        self.apply_cut(['all'])
         # Outdir for plots
         self.outdir= get_outdir(comparison)
 
@@ -85,7 +87,8 @@ class Single_DataSet(object):
         # "PSF" not 'PSF '
         self.tractor['type']= np.char.strip(self.tractor['type']) 
         
-    def get_more(self):
+    def get_extra_data(self):
+        '''computes additional data using tractor catalogue, returns as astropy table'''
         # AB Mags
         mag= self.get_magAB()
         mag_ivar= self.get_magAB_ivar()
@@ -100,14 +103,10 @@ class Single_DataSet(object):
                                     self.tractor['decam_flux_ivar']
  
     def get_keep_dict(self):
-        '''permanent -- a special key in the "keep" dict which is always used if set, default="all"
-        current -- the currently set boolean array, self.select() sets self.keep["current"] to what you want
-        all other keys only used when explicitly set with "self.select(key_name)"'''
+        '''current -- the currently set boolean array'''
         # True where want to keep
-        return dict(permanent= np.ones(len(self.tractor)).astype(bool),\
-                    current= np.ones(len(self.tractor)).astype(bool),\
-                    default= self.basic_cuts(),\
-                    all= np.ones(len(self.tractor)).astype(bool),\
+        return dict(all= np.ones(len(self.tractor)).astype(bool),\
+                    clean= self.clean_cut(),\
                     psf= self.tractor['type'].data == 'PSF',\
                     simp= self.tractor['type'].data == 'SIMP',\
                     exp= self.tractor['type'].data == 'EXP',\
@@ -116,7 +115,7 @@ class Single_DataSet(object):
                     extended= self.tractor['type'].data != 'PSF')
         #self.targets= self.get_TargetSelectin(data)
 
-    def basic_cuts(self): 
+    def clean_cut(self): 
         return  np.any((self.t['decam_flux'].data[:,1] > 0,\
                         self.t['decam_flux'].data[:,2] > 0,\
                         self.t['decam_flux'].data[:,4] > 0, \
@@ -128,33 +127,36 @@ class Single_DataSet(object):
                         self.t['decam_fracflux'].data[:,4] <= 0.05,\
                         self.t['brick_primary'].data == True),axis=0)
 
-    def select(self,keep_list):
+    def get_cut(self,keep_list):
         '''keep_list -- list of names from "keep" dict to use as a subset
-        permanent -- a special key in the "keep" dict which is always used if set, default="all"'''
-        # Add permanent to list
-        keep_list+= ['permanent'] 
-        for name in list_of_names: assert(name in self.keep.keys())
-        # Union
-        keep= self.keep[keep_list[0]]
+        return boolean array to be used for cut'''
+        # Check that keep_list is a list
+        assert("<type 'list'>" == repr(type(keep_list)))
+        # Name must exist in b_arrays dict
+        for name in list_of_names: assert(name in self.b_arrays.keys())
+        # Union of cuts
+        keep= self.b_arrays[keep_list[0]]
         if len(keep_list) > 1:
             for i,name in enumerate(keep_list[1:]): 
-                keep= np.all((keep, self.keep[name]), axis=0)
-        # Apply
-        self.apply_selection(keep)
-
-    def select_my_own(self, my_b_arr):
-        '''keep your own boolean array'''
-        # Add permanent to list
-        keep= np.all((my_b_arr, self.keep['permanent']), axis=0)
-        # Apply
-        self.apply_selection(keep)
+                keep= np.all((keep, self.b_arrays[name]), axis=0)
+        return keep
     
-    def apply_selection(self,b_arr):
-        self.keep['current']= b_arr
-        self.t= self.tractor[b_arr] 
-        self.o= self.tractor[b_arr] 
+    def apply_cut(self,keep_list):
+        '''cut astropy tables to keep_list bool arrays, store in 
+        self.data'''
+        keep= self.get_cut(keep_list)
+        self.data['tractor']= self.tractor[keep] 
+        self.data['extra']= self.extra[keep] 
 
-    def number_kept(self):
+    def add_myown_cut(self, name=None,b_array=None):
+        '''add "name" to self.b_arrays dictionary'''
+        assert(name is not None and b_array is not None)
+        if name in self.b_arrays.keys(): 
+            print "choose a different name for %s, already in self.b_arrays.keys()", % name
+            raise ValueError
+        self.b_arrays['name'] = b_array
+    
+    def n_in_cut(self):
         return len(self.t)
     #def get_TargetSelectin(self, data):
     ##### store as self.t.masks['elg'], self.t.masks['lrg'], etc
@@ -173,8 +175,16 @@ class Matched_DataSet(object):
         # Combine catalogues and get all info could possibly need
         self.ref= Single_DataSet(ref_cats_file, comparison=comparison,debug=debug)
         self.test= Single_DataSet(test_cats_file, comparison=comparison,debug=debug)
-        # Matching indices, as dict of boolean arrays
-        self.m_dict= self.do_matching()
+        # Add bool arrays for matched, unmatched sources
+        m_dict= self.do_matching()
+        self.ref.add_myown_cut(name='match',b_array=m_dict['ref_match'])
+        self.ref.add_myown_cut(name='unmatch',b_array=m_dict['ref_miss'])
+        self.test.add_myown_cut(name='match',b_array=m_dict['test_match'])
+        self.test.add_myown_cut(name='unmatch',b_array=m_dict['test_miss'])
+        # Use all sources by default
+        self.apply_cut(['all'])   
+        # Get meta data, like output dir
+        self.outdir= self.ref.outdir 
 
     def do_matching(self):
         '''matches test ra,dec to ref ra,dec
@@ -200,17 +210,17 @@ class Matched_DataSet(object):
         b_arr[indices]= True
         return b_arr
  
-    def use_matched(self):
-        self.ref.keep['permanent']= self.keep['ref_match']
-        self.test.keep['permanent']= self.keep['test_match']
-    
-    def use_missed(self):
-        self.ref.keep['permanent']= self.keep['ref_miss']
-        self.test.keep['permanent']= self.keep['test_miss']
-          
-    def select(self,keep_list):
-        '''select keys in keep_list from ref and test data sets'''
-        self.ref.select(keep_list)
-        self.test.select(keep_list)
+    def apply_cut(self,keep_list):
+        '''call the apply_cut atrribute of self.ref and self.test'''
+        if 'match' in keep_list:
+            # Ref gflux > 0, test gflux > 0 could through out diff number objects in Ref,Test prevent this
+            keep= np.all((self.ref.get_cut(keep_list),\
+                          self.test.get_cut(keep_list)), axis=0)
+            self.ref.add_myown_cut(name='both',b_array=keep)
+            self.test.add_myown_cut(name='both',b_array=keep)
+            keep_list= ['both']
+        # Apply cut to for unique b_arrays of ref and test
+        self.ref.apply_cut(keep_list)
+        self.test.apply_cut(keep_list)
 
 

@@ -26,41 +26,40 @@ args = parser.parse_args()
 # Get data
 d= Matched_DataSet(args.decals_list, args.bassmos_list, \
                    comparison='test',debug=True)
-# Matched sources, all 
-d.use('matched')
-d.select('all')
+# Cut to matched sources with clean photometry 
+d.apply_cut(['match','clean'])
 
+plots.nobs(d.data['tractor'], outname=os.path.join(d.outdir,'nobs_decals.png'))
+
+#plots.nobs(d.test_matched, name='BASS_MzLS')
+#plots.radec(d.ref_matched, name='Matched')
+#plots.radec(d.ref_missed, name='Missed_Ref')
+#plots.radec(d.test_missed, name='Missed_Test')
+#plots.matched_dist(d.ref_matched,d.meta['d_matched'], name='')
+#plots.hist_types(d.ref_matched, name='Ref')
+#plots.hist_types(d.test_matched, name='Test')
+#plots.n_per_deg2(d.ref_matched, deg2=d.meta['deg2']['ref'], name='Ref_MatchedDefault')
+#plots.n_per_deg2(d.test_matched, deg2=d.meta['deg2']['test'], name='Test_MatchedDefault')
 #
-plots.nobs(d.ref_matched, name='DECaLS')
-plots.nobs(d.test_matched, name='BASS_MzLS')
-plots.radec(d.ref_matched, name='Matched')
-plots.radec(d.ref_missed, name='Missed_Ref')
-plots.radec(d.test_missed, name='Missed_Test')
-plots.matched_dist(d.ref_matched,d.meta['d_matched'], name='')
-plots.hist_types(d.ref_matched, name='Ref')
-plots.hist_types(d.test_matched, name='Test')
-plots.n_per_deg2(d.ref_matched, deg2=d.meta['deg2']['ref'], name='Ref_MatchedDefault')
-plots.n_per_deg2(d.test_matched, deg2=d.meta['deg2']['test'], name='Test_MatchedDefault')
-
-# Change mask to union of default masks
-d.ref_matched.add_to_current_mask(d.test_matched.masks['default'])
-d.test_matched.add_to_current_mask(d.ref_matched.masks['default'])
-plots.radec(d.ref_matched, name='Matched_DefaultUnion')
-plots.hist_types(d.ref_matched, name='Ref_DefaultUnion')
-plots.hist_types(d.test_matched, name='Test_DefaultUnion')
-plots.confusion_matrix(d.ref_matched,d.test_matched, name='UnionDefault',\
-                       ref_name='DECaLS',test_name='BASS_MzLS')
-
-# union of default + PSF
-d.ref_matched.apply_mask_by_names(['current','psf'])
-d.test_matched.apply_mask_by_names(['current','psf'])
-plots.delta_mag_vs_mag(d.ref_matched,d.test_matched, name='UnionDefaultPsf')
-plots.chi_v_gaussian(d.ref_matched,d.test_matched, low=-8.,hi=8., name='UnionDefaultPsf')
-
-# Change mask to default + PSF
-d.ref_matched.apply_mask_by_names(['default','psf'])
-d.test_matched.apply_mask_by_names(['default','psf'])
-plots.sn_vs_mag(d.ref_matched, name="Ref_DefaultPsf")
-plots.sn_vs_mag(d.test_matched, name="Test_DefaultPsf")
+## Change mask to union of default masks
+#d.ref_matched.add_to_current_mask(d.test_matched.masks['default'])
+#d.test_matched.add_to_current_mask(d.ref_matched.masks['default'])
+#plots.radec(d.ref_matched, name='Matched_DefaultUnion')
+#plots.hist_types(d.ref_matched, name='Ref_DefaultUnion')
+#plots.hist_types(d.test_matched, name='Test_DefaultUnion')
+#plots.confusion_matrix(d.ref_matched,d.test_matched, name='UnionDefault',\
+#                       ref_name='DECaLS',test_name='BASS_MzLS')
+#
+## union of default + PSF
+#d.ref_matched.apply_mask_by_names(['current','psf'])
+#d.test_matched.apply_mask_by_names(['current','psf'])
+#plots.delta_mag_vs_mag(d.ref_matched,d.test_matched, name='UnionDefaultPsf')
+#plots.chi_v_gaussian(d.ref_matched,d.test_matched, low=-8.,hi=8., name='UnionDefaultPsf')
+#
+## Change mask to default + PSF
+#d.ref_matched.apply_mask_by_names(['default','psf'])
+#d.test_matched.apply_mask_by_names(['default','psf'])
+#plots.sn_vs_mag(d.ref_matched, name="Ref_DefaultPsf")
+#plots.sn_vs_mag(d.test_matched, name="Test_DefaultPsf")
 
 print('finished DECaLS to BASS/MzLS comparison')

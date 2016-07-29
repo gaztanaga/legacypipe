@@ -43,18 +43,17 @@ def bin_up(data_bin_by,data_for_percentile, bin_minmax=(18.,26.),nbins=20):
     return vals
 
 # Main plotting functions 
-def nobs(obj, name=''):
+def nobs(tractor, outname='test.png'):
     '''make histograms of nobs so can compare depths of g,r,z between the two catalogues
-    obj -- Single_TractorCat()'''   
-    hi= np.max(obj.t['decam_nobs'][:,[1,2,4]])
+    tractor -- Tractor catalogue in a table'''   
+    hi= np.max(tractor['decam_nobs'][:,[1,2,4]])
     fig,ax= plt.subplots(3,1)
     for i, band,iband in zip(range(3),['g','r','z'],[1,2,4]):
-        ax[i].hist(obj.t['decam_nobs'][:,iband],\
+        ax[i].hist(tractor['decam_nobs'][:,iband],\
                    bins=hi+1,normed=True,cumulative=True,align='mid')
         xlab=ax[i].set_xlabel('nobs %s' % band, **kwargs.ax)
         ylab=ax[i].set_ylabel('CDF', **kwargs.ax)
-    plt.savefig(os.path.join(obj.outdir,'nobs_%s.png' % name), \
-                bbox_extra_artists=[xlab,ylab], **kwargs.save)
+    plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
     plt.close()
 
 def radec(obj,name=''): 
