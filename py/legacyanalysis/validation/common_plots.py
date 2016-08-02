@@ -56,15 +56,14 @@ def nobs(tractor, outname='test.png'):
     plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
     plt.close()
 
-def radec(obj,name=''): 
+def radec(tractor,outname='test.png'): 
     '''ra,dec distribution of objects
     obj -- Single_TractorCat()'''
-    plt.scatter(obj.t['ra'], obj.t['dec'], \
+    plt.scatter(tractor['ra'], tractor['dec'], \
                 edgecolor='b',c='none',lw=1.)
     xlab=plt.xlabel('RA', **kwargs.ax)
     ylab=plt.ylabel('DEC', **kwargs.ax)
-    plt.savefig(os.path.join(obj.outdir,'radec_%s.png' % name), \
-                bbox_extra_artists=[xlab,ylab], **kwargs.save)
+    plt.savefig(outname,bbox_extra_artists=[xlab,ylab], **kwargs.save)
     plt.close()
 
 
@@ -123,27 +122,27 @@ def sn_vs_mag(obj, mag_minmax=(18.,26.),name=''):
                 bbox_extra_artists=[xlab,ylab], **kwargs.save)
     plt.close()
 
-def create_confusion_matrix(ref_obj,test_obj):
+def create_confusion_matrix(ref_tractor,test_tractor):
     '''compares MATCHED reference (truth) to test (prediction)
     ref_obj,test_obj -- reference,test Single_TractorCat()
     return 5x5 confusion matrix and colum/row names'''
     cm=np.zeros((5,5))-1
     types=['PSF','SIMP','EXP','DEV','COMP']
     for i_ref,ref_type in enumerate(types):
-        cut_ref= np.where(ref_obj.t['type'] == ref_type)[0]
+        cut_ref= np.where(ref_tractor['type'] == ref_type)[0]
         #n_ref= ref_obj.number_not_masked(['current',ref_type.lower()])
         for i_test,test_type in enumerate(types):
-            n_test= np.where(test_obj.t['type'][ cut_ref ] == test_type)[0].size
+            n_test= np.where(test_tractor['type'][ cut_ref ] == test_type)[0].size
             if cut_ref.size > 0: cm[i_ref,i_test]= float(n_test)/cut_ref.size
             else: cm[i_ref,i_test]= np.nan
     return cm,types
 
 
-def confusion_matrix(ref_obj,test_obj, name='',\
+def confusion_matrix(ref_tractor,test_tractor, outname='test.png',\
                      ref_name='ref',test_name='test'):
     '''plot confusion matrix
     ref_obj,test_obj -- reference,test Single_TractorCat()'''
-    cm,ticknames= create_confusion_matrix(ref_obj,test_obj)
+    cm,ticknames= create_confusion_matrix(ref_tractor,test_tractor)
     plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues,vmin=0,vmax=1)
     cbar=plt.colorbar()
     plt.xticks(range(len(ticknames)), ticknames)
@@ -158,8 +157,7 @@ def confusion_matrix(ref_obj,test_obj, name='',\
                 plt.text(col,row,'%.2f' % cm[row,col],va='center',ha='center',color='yellow')
             else:
                 plt.text(col,row,'%.2f' % cm[row,col],va='center',ha='center',color='black')
-    plt.savefig(os.path.join(ref_obj.outdir,'confusion_matrix_%s.png' % name), \
-                bbox_extra_artists=[xlab,ylab], **kwargs.save)
+    plt.savefig(outname,bbox_extra_artists=[xlab,ylab], **kwargs.save)
     plt.close()
 
 

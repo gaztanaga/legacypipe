@@ -14,7 +14,7 @@ import argparse
 import pickle
 
 from legacyanalysis.validation.pathnames import get_outdir
-from legacyanalysis.validation.combine_cats import Matched_DataSet
+from legacyanalysis.validation.combine_cats import get_matched_dataset
 import legacyanalysis.validation.common_plots as plots
 
 parser=argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -24,20 +24,21 @@ parser.add_argument('--bassmos_list', type=str, help='ditto',required=True)
 args = parser.parse_args()
 
 # Get data for Matched sources
-d= Matched_DataSet(args.decals_list, args.bassmos_list, \
-                   comparison='test',debug=True)
-# Cut to clean photometry 
-d.apply_cut(['clean'])
-plots.nobs(d.ref.data['tractor'], outname=os.path.join(d.outdir,'nobs_decals_ref_clean.png'))
-plots.nobs(d.test.data['tractor'], outname=os.path.join(d.outdir,'nobs_decals_test_clean.png'))
+d= get_matched_dataset(args.decals_list, args.bassmos_list, \
+                       comparison='bmd',debug=False)
+# All matched 
+d.apply_cut(['all'])
+plots.nobs(d.ref.data['tractor'], outname=os.path.join(d.outdir,'nobs_decals.png'))
+plots.nobs(d.test.data['tractor'], outname=os.path.join(d.outdir,'nobs_bass.png'))
+plots.radec(d.ref.data['tractor'], outname=os.path.join(d.outdir,'radec_decals.png'))
+plots.radec(d.test.data['tractor'], outname=os.path.join(d.outdir,'radec_bass.png'))
 
-# Cut to clean and psf photometry 
+# Clean and psf 
 d.apply_cut(['clean','psf'])
-plots.nobs(d.data['tractor'], outname=os.path.join(d.outdir,'nobs_decals_clean_psf.png'))
+plots.confusion_matrix(d.ref.data['tractor'],d.test.data['tractor'], outname=os.path.join(d.outdir,'conf.png'),\
+                       ref_name='DECaLS',test_name='BASS_MzLS')
 
 #plots.nobs(d.test_matched, name='BASS_MzLS')
-#plots.radec(d.ref_matched, name='Matched')
-#plots.radec(d.ref_missed, name='Missed_Ref')
 #plots.radec(d.test_missed, name='Missed_Test')
 #plots.matched_dist(d.ref_matched,d.meta['d_matched'], name='')
 #plots.hist_types(d.ref_matched, name='Ref')
@@ -51,8 +52,6 @@ plots.nobs(d.data['tractor'], outname=os.path.join(d.outdir,'nobs_decals_clean_p
 #plots.radec(d.ref_matched, name='Matched_DefaultUnion')
 #plots.hist_types(d.ref_matched, name='Ref_DefaultUnion')
 #plots.hist_types(d.test_matched, name='Test_DefaultUnion')
-#plots.confusion_matrix(d.ref_matched,d.test_matched, name='UnionDefault',\
-#                       ref_name='DECaLS',test_name='BASS_MzLS')
 #
 ## union of default + PSF
 #d.ref_matched.apply_mask_by_names(['current','psf'])

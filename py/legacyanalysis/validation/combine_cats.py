@@ -22,7 +22,7 @@ from astropy.io import fits
 from astropy.table import vstack, Table, Column
 from astrometry.libkd.spherematch import match_radec
 
-from legacyanalysis.validation.pathnames import get_outdir
+import legacyanalysis.validation.pathnames as myio
 
 def read_lines(fn):
     fin=open(fn,'r')
@@ -80,7 +80,7 @@ class Single_DataSet(object):
         # Initialize without cuts, Creates self.data dict which has 'tractor','extra' cut astropy tables
         self.apply_cut(['all'])
         # Outdir for plots
-        self.outdir= get_outdir(comparison)
+        self.outdir= myio.get_outdir(comparison)
 
     def clean_up(self):
         # "PSF" not 'PSF '
@@ -190,21 +190,16 @@ class Matched_DataSet(object):
         self.test= Single_DataSet(test_cats_file, comparison=comparison,debug=debug)
         # Overwrite tractor cats with matched lists 
         m_dict= self.do_matching()
-        print('before: len(self.ref.tractor)=%d, len(self.test.tractor)=%d' % \
-                (len(self.ref.tractor), len(self.test.tractor)))
         self.ref.hard_cut(i_array= m_dict['ref_imatch'])
         self.test.hard_cut(i_array= m_dict['test_imatch'])
-        print('after: len(self.ref.tractor)=%d, len(self.test.tractor)=%d' % \
-                (len(self.ref.tractor), len(self.test.tractor)))
         assert(len(self.ref.tractor) == len(self.test.tractor))
         #self.ref.add_myown_cut(name='match',b_array=m_dict['ref_match'])
         #self.ref.add_myown_cut(name='unmatch',b_array=m_dict['ref_miss'])
         #self.test.add_myown_cut(name='match',b_array=m_dict['test_match'])
         #self.test.add_myown_cut(name='unmatch',b_array=m_dict['test_miss'])
         # Use all sources by default
-        self.apply_cut(['all'])   
-        # Get meta data, like output dir
-        self.outdir= self.ref.outdir 
+        self.apply_cut(['all'])  
+        self.outdir= self.ref.outdir
 
     def do_matching(self):
         '''matches test ra,dec to ref ra,dec
@@ -250,4 +245,15 @@ class Matched_DataSet(object):
             self.ref.apply_cut(keep_list)
             self.test.apply_cut(keep_list)
 
-
+def get_matched_dataset(decals_list, bassmos_list, \
+                        comparison='test',debug=False):
+    # Return saved file if exists
+    fn= myio.get_checkpt(comparison) 
+    if os.path.exists(fn): 
+        return myio.read_checkpt(comparison)
+    # Compute and save
+    else: 
+        obj= Matched_DataSet(decals_list, bassmos_list, \
+                             comparison=comparison,debug=debug)
+        myio.dump_checkpt(obj,comparison)
+        return obj

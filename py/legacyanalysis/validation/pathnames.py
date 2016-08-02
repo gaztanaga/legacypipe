@@ -1,4 +1,6 @@
 import os
+from pickle import dump,load
+
 
 def bash(cmd):
     ret= os.system('%s' % cmd)
@@ -44,5 +46,22 @@ def get_indir(comparison,indir='/project/projectdirs/desi/imaging/data/validatio
         dir= os.path.join(indir,'dr2dr3/')
     else: raise ValueError
     return dir
+
+def get_checkpt(comparison):
+    outdir= get_outdir(comparison)
+    return os.path.join(outdir,'%s.pickle' % comparison)
+
+def read_checkpt(comparison):
+    fn= get_checkpt(comparison)
+    fin=open(fn,'r')
+    data= load(fin)
+    fin.close()
+    return data
+
+def dump_checkpt(data,comparison):
+    fn= get_checkpt(comparison) 
+    fout=open(fn,'w')
+    dump(data,fout)
+    fout.close()
 
 
