@@ -23,13 +23,17 @@ parser.add_argument('--decals_list', type=str, help='list of tractor cats',requi
 parser.add_argument('--bassmos_list', type=str, help='ditto',required=True) 
 args = parser.parse_args()
 
-# Get data
+# Get data for Matched sources
 d= Matched_DataSet(args.decals_list, args.bassmos_list, \
                    comparison='test',debug=True)
-# Cut to matched sources with clean photometry 
-d.apply_cut(['match','clean'])
+# Cut to clean photometry 
+d.apply_cut(['clean'])
+plots.nobs(d.ref.data['tractor'], outname=os.path.join(d.outdir,'nobs_decals_ref_clean.png'))
+plots.nobs(d.test.data['tractor'], outname=os.path.join(d.outdir,'nobs_decals_test_clean.png'))
 
-plots.nobs(d.data['tractor'], outname=os.path.join(d.outdir,'nobs_decals.png'))
+# Cut to clean and psf photometry 
+d.apply_cut(['clean','psf'])
+plots.nobs(d.data['tractor'], outname=os.path.join(d.outdir,'nobs_decals_clean_psf.png'))
 
 #plots.nobs(d.test_matched, name='BASS_MzLS')
 #plots.radec(d.ref_matched, name='Matched')

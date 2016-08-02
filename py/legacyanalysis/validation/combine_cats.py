@@ -126,16 +126,26 @@ class Single_DataSet(object):
                         self.tractor['decam_fracflux'].data[:,4] <= 0.05,\
                         self.tractor['brick_primary'].data == True),axis=0)
 
+    def hard_cut(self,i_array=None):
+        '''keep data where have index in i_array'''
+        assert(i_array is not None)
+        self.tractor= self.tractor[i_array]
+        self.extra= self.extra[i_array]
+        # Re-initialize
+        self.b_arrays= self.get_keep_dict()
+        self.data= dict(tractor=None,extra=None)
+        self.apply_cut(['all'])
+
     def get_cut(self,list_of_names):
-        '''list_of_names -- keys from b_arrays dict use as a subset
+        '''applies cut to data["tractor"],data["extra"], so self.tractor kept
+        list_of_names -- keys from b_arrays dict use as a subset
         return boolean array to be used for cut'''
         # Check that keep_list is a list
         assert("<type 'list'>" == repr(type(list_of_names)))
         # Union of cuts
-        keep= self.b_arrays[list_of_names[0]]
-        if len(list_of_names) > 1:
-            for i,name in enumerate(list_of_names[1:]): 
-                keep= np.all((keep, self.b_arrays[name]), axis=0)
+        keep= np.ones(len(self.tractor)).astype(bool)
+        for i,name in enumerate(list_of_names[1:]):
+            keep*= self.b_arrays[name]
         return keep
     
     def apply_cut(self,list_of_names):
@@ -145,13 +155,19 @@ class Single_DataSet(object):
         self.data['tractor']= self.tractor[keep] 
         self.data['extra']= self.extra[keep] 
 
+    def apply_single_bcut(self,b_array=None):
+        assert(b_array is not None)
+        self.data['tractor']= self.tractor[b_array] 
+        self.data['extra']= self.extra[b_array] 
+
     def add_myown_cut(self, name=None,b_array=None):
         '''add "name" to self.b_arrays dictionary'''
         assert(name is not None and b_array is not None)
         if name in self.b_arrays.keys(): 
             print("choose a different name for %s, already in self.b_arrays.keys()" % name)
             raise ValueError
-        self.b_arrays['name'] = b_array
+        print('adding %s to self.b_arrays' % name)
+        self.b_arrays[name] = b_array
     
     def n_in_cut(self):
         return len(self.t)
@@ -172,12 +188,19 @@ class Matched_DataSet(object):
         # Combine catalogues and get all info could possibly need
         self.ref= Single_DataSet(ref_cats_file, comparison=comparison,debug=debug)
         self.test= Single_DataSet(test_cats_file, comparison=comparison,debug=debug)
-        # Add bool arrays for matched, unmatched sources
+        # Overwrite tractor cats with matched lists 
         m_dict= self.do_matching()
-        self.ref.add_myown_cut(name='match',b_array=m_dict['ref_match'])
-        self.ref.add_myown_cut(name='unmatch',b_array=m_dict['ref_miss'])
-        self.test.add_myown_cut(name='match',b_array=m_dict['test_match'])
-        self.test.add_myown_cut(name='unmatch',b_array=m_dict['test_miss'])
+        print('before: len(self.ref.tractor)=%d, len(self.test.tractor)=%d' % \
+                (len(self.ref.tractor), len(self.test.tractor)))
+        self.ref.hard_cut(i_array= m_dict['ref_imatch'])
+        self.test.hard_cut(i_array= m_dict['test_imatch'])
+        print('after: len(self.ref.tractor)=%d, len(self.test.tractor)=%d' % \
+                (len(self.ref.tractor), len(self.test.tractor)))
+        assert(len(self.ref.tractor) == len(self.test.tractor))
+        #self.ref.add_myown_cut(name='match',b_array=m_dict['ref_match'])
+        #self.ref.add_myown_cut(name='unmatch',b_array=m_dict['ref_miss'])
+        #self.test.add_myown_cut(name='match',b_array=m_dict['test_match'])
+        #self.test.add_myown_cut(name='unmatch',b_array=m_dict['test_miss'])
         # Use all sources by default
         self.apply_cut(['all'])   
         # Get meta data, like output dir
@@ -189,16 +212,26 @@ class Matched_DataSet(object):
         m1, m2, d12 = match_radec(self.ref.tractor['ra'].data.copy(), self.ref.tractor['dec'].data.copy(),\
                                   self.test.tractor['ra'].data.copy(), self.test.tractor['dec'].data.copy(),\
                                   1.0/3600.0)
+        #print("len(m1)=%d, len(m2)=%d" % (len(m1),len(m2)))
         print("Matched: %d/%d objects" % (m1.size,len(self.ref.tractor)))
         miss1 = np.delete(np.arange(len(self.ref.tractor)), m1, axis=0)
         miss2 = np.delete(np.arange(len(self.test.tractor)), m2, axis=0)
         # Indices to bool array
-        ref_rows= len(self.ref.tractor)
-        test_rows= len(self.test.tractor)
-        return dict(ref_match= self.indices2bool(m1,rows=ref_rows),\
-                    ref_miss= self.indices2bool(miss1,rows=ref_rows),\
-                    test_match= self.indices2bool(m2,rows=test_rows),\
-                    test_miss= self.indices2bool(miss2,rows=test_rows))
+        #ref_rows= len(self.ref.tractor)
+        #test_rows= len(self.test.tractor)
+        #junk_ref= self.indices2bool(m1,rows=ref_rows)
+        #junk_test= self.indices2bool(m2,rows=test_rows)
+        #print('N true, junk_ref=%d, junk_test=%d' % (np.where(junk_ref)[0].size,np.where(junk_test)[0].size))
+        #print('exiting early')
+        #sys.exit() 
+        #return dict(ref_imatch= self.indices2bool(m1,rows=ref_rows),\
+        #            ref_imiss= self.indices2bool(miss1,rows=ref_rows),\
+        #            test_imatch= self.indices2bool(m2,rows=test_rows),\
+        #            test_imiss= self.indices2bool(miss2,rows=test_rows))
+        return dict(ref_imatch= m1,\
+                    ref_imiss= miss1, \
+                    test_imatch= m2,\
+                    test_imiss= miss2)
 
     def indices2bool(self,indices,rows=None):
         '''convert indices for an array into boolean array of same length as array'''
@@ -207,17 +240,14 @@ class Matched_DataSet(object):
         b_arr[indices]= True
         return b_arr
  
-    def apply_cut(self,keep_list):
+    def apply_cut(self,keep_list,union=True):
         '''call the apply_cut atrribute of self.ref and self.test'''
-        if 'match' in keep_list:
-            # Ref gflux > 0, test gflux > 0 could through out diff number objects in Ref,Test prevent this
-            keep= np.all((self.ref.get_cut(keep_list),\
-                          self.test.get_cut(keep_list)), axis=0)
-            self.ref.add_myown_cut(name='both',b_array=keep)
-            self.test.add_myown_cut(name='both',b_array=keep)
-            keep_list= ['both']
-        # Apply cut to for unique b_arrays of ref and test
-        self.ref.apply_cut(keep_list)
-        self.test.apply_cut(keep_list)
+        if union: 
+            keep= self.ref.get_cut(keep_list)*self.test.get_cut(keep_list)
+            self.ref.apply_single_bcut(b_array=keep)
+            self.test.apply_single_bcut(b_array=keep)
+        else:
+            self.ref.apply_cut(keep_list)
+            self.test.apply_cut(keep_list)
 
 
