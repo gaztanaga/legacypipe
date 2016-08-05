@@ -160,6 +160,71 @@ def confusion_matrix(ref_tractor,test_tractor, outname='test.png',\
     plt.savefig(outname,bbox_extra_artists=[xlab,ylab], **kwargs.save)
     plt.close()
 
+def create_stack(answer_type,predict_type, types=['PSF','SIMP','EXP','DEV','COMP'],slim=True):
+    '''compares classifications of matched objects, returns 2D array which is conf matrix and xylabels
+    return 5x5 confusion matrix and colum/row names
+   answer_type,predict_type -- arrays of same length with reference and prediction types'''
+    for typ in set(answer_type): assert(typ in types)
+    for typ in set(predict_type): assert(typ in types)
+    # if a type was not in answer (training) list then don't put in cm
+    if slim: ans_types= set(answer_type)
+    # put in cm regardless
+    else: ans_types= set(types)
+    cm=np.zeros((len(ans_types),len(types)))-1
+    for i_ans,ans_type in enumerate(ans_types):
+        ind= np.where(answer_type == ans_type)[0]
+        for i_pred,pred_type in enumerate(types):
+            n_pred= np.where(predict_type[ind] == pred_type)[0].size
+            if ind.size > 0: cm[i_ans,i_pred]= float(n_pred)/ind.size # ind.size is constant for loop over pred_types
+            else: cm[i_ans,i_pred]= np.nan
+    if slim: return cm,ans_types,types #size ans_types != types
+    else: return cm,types
+
+def plot_stack(cm_stack,stack_names,all_names, \
+               ref_name='ref',test_name='test',\
+               outname='test.png'):
+    '''cm_stack -- list of single row confusion matrices
+    stack_names -- list of same len as cm_stack, names for each row of cm_stack'''
+    # combine list into single cm
+    cm=np.zeros((len(cm_stack),len(all_names)))+np.nan
+    for i in range(cm.shape[0]): cm[i,:]= cm_stack[i]
+    # make usual cm, but labels repositioned
+    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+    cbar=plt.colorbar()
+    plt.xticks(range(len(all_names)), all_names)
+    plt.yticks(range(len(stack_names)), stack_names)
+    ylab=plt.ylabel('True (%s) = PSF' % ref_name)
+    xlab=plt.xlabel('Predicted (%s)' % test_name)
+    for row in range(len(stack_names)):
+        for col in range(len(all_names)):
+            if np.isnan(cm[row,col]):
+                plt.text(col,row,'n/a',va='center',ha='center')
+            elif cm[row,col] > 0.5:
+                plt.text(col,row,'%.2f' % cm[row,col],va='center',ha='center',color='yellow')
+            else:
+                plt.text(col,row,'%.2f' % cm[row,col],va='center',ha='center',color='black')
+            #if np.isnan(cm[row,col]): 
+            #    plt.text(col,row,'n/a',va='center',ha='center')
+            #else: plt.text(col,row,'%.2f' % cm[row,col],va='center',ha='center')
+    plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
+    plt.close()
+
+def stacked_confusion_matrix(ref_tractor,test_tractor,\
+                             ref_extra,test_extra,\
+                             ref_name='ref',test_name='test', outname='test.png'):
+    types= ['PSF ', 'SIMP', 'EXP ', 'DEV ', 'COMP']
+    cm_stack,stack_names=[],[]
+    rbins= np.array([18.,20.,22.,23.,24.])
+    for rmin,rmax in zip(rbins[:-1],rbins[1:]):
+        # master cut
+        br_cut= np.all((ref_extra['mag'][:,2] > rmin,ref_extra['mag'][:,2] <= rmax),axis=0)
+        stack_names+= ["%d < r <= %d" % (int(rmin),int(rmax))]
+        cm,ans_names,all_names= create_stack(np.array(['PSF ']*len(ref_tractor)),
+                                             test_tractor['type'], \
+                                             types=types)
+        cm_stack+= [cm]
+    plot_stack(cm_stack, stack_names,all_names, \
+               ref_name=ref_name,test_name=test_name,outname=outname)
 
 
 def matched_dist(obj,dist, name=''):
@@ -178,13 +243,15 @@ def matched_dist(obj,dist, name=''):
                 bbox_extra_artists=[xlab,ylab], **kwargs.save)
     plt.close()
 
-def chi_v_gaussian(ref_obj,test_obj, low=-8.,hi=8., name=''):
+def chi_v_gaussian(ref_tractor,test_tractor,\
+                   ref_extra,test_extra,\
+                   low=-8.,hi=8., outname='test.png'):
     # Compute Chi
     chi={} 
     for band,iband in zip(['g','r','z'],[1,2,4]):
-        chi[band]= (ref_obj.t['decam_flux'][:,iband]-test_obj.t['decam_flux'][:,iband])/\
-                   np.sqrt( np.power(ref_obj.t['decam_flux_ivar'][:,iband],-1)+\
-                            np.power(test_obj.t['decam_flux_ivar'][:,iband],-1))
+        chi[band]= (ref_tractor['decam_flux'][:,iband]-test_tractor['decam_flux'][:,iband])/\
+                   np.sqrt( np.power(ref_tractor['decam_flux_ivar'][:,iband],-1)+\
+                            np.power(test_tractor['decam_flux_ivar'][:,iband],-1))
     for b_low,b_hi in zip([18,19,20,21,22,23],[19,20,21,22,23,24]):
         #loop over mag bins, one 3 panel for each mag bin
         hist= dict(g=0,r=0,z=0)
@@ -192,8 +259,8 @@ def chi_v_gaussian(ref_obj,test_obj, low=-8.,hi=8., name=''):
         stats=dict(g=0,r=0,z=0)
         # Counts per bin
         for band,iband in zip(['g','r','z'],[1,2,4]):
-            imag= np.all((b_low <= ref_obj.t['decam_mag'][:,iband],\
-                          ref_obj.t['decam_mag'][:,iband] < b_hi),axis=0)
+            imag= np.all((b_low <= ref_extra['mag'][:,iband],\
+                          ref_extra['mag'][:,iband] < b_hi),axis=0)
             hist[band],bins= np.histogram(chi[band][imag],\
                                     range=(low,hi),bins=50,normed=True)
             db= (bins[1:]-bins[:-1])/2
@@ -216,27 +283,25 @@ def chi_v_gaussian(ref_obj,test_obj, low=-8.,hi=8., name=''):
         ylab=ax[0].set_ylabel('PDF', **kwargs.ax)
         ti=ax[1].set_title("%s (%.1f <= %s < %.1f)" % (type,b_low,band,b_hi),**kwargs.ax)
         #put stats in suptitle
-        plt.savefig(os.path.join(ref_obj.outdir,'chi_%.1f-%s-%.1f_%s.png' % (b_low,band,b_hi, name)), \
-                    bbox_extra_artists=[ti,xlab,ylab], **kwargs.save)
+        plt.savefig(outname, bbox_extra_artists=[ti,xlab,ylab], **kwargs.save)
         plt.close()
 
-def delta_mag_vs_mag(ref_obj,test_obj, name='',\
-                     ref_name='ref',test_name='test'):
+def delta_mag_vs_mag(ref_extra,test_extra, ref_name='ref',test_name='test',\
+                     outname='test.png'):
     fig,ax=plt.subplots(1,3,figsize=(9,3),sharey=True)
     plt.subplots_adjust(wspace=0.25)
-    for cnt,band,iband in zip(range(3),['g','r','z'],[1,2,4]):
-        delta= test_obj.t['decam_mag'][:,iband]- ref_obj.t['decam_mag'][:,iband]
-        ax[cnt].scatter(ref_obj.t['decam_mag'][:,iband],\
-                        delta,\
+    for cnt,iband in zip(range(3),[1,2,4]):
+        delta= test_extra['mag'][:,iband]- ref_extra['mag'][:,iband]
+        ax[cnt].scatter(ref_extra['mag'][:,iband],delta,\
                         c='b',edgecolor='b',s=5) #,c='none',lw=2.)
     for cnt,band in zip(range(3),['g','r','z']):
         xlab=ax[cnt].set_xlabel('%s AB' % band, **kwargs.ax)
         ax[cnt].set_ylim(-0.1,0.1)
         ax[cnt].set_xlim(18,26)
     ylab=ax[0].set_ylabel('mag (%s) - mag(%s)' % (test_name,ref_name), **kwargs.ax)
-    plt.savefig(os.path.join(ref_obj.outdir,'delta_mag_%s.png' % name), \
-                bbox_extra_artists=[xlab,ylab], **kwargs.save)
+    plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
     plt.close()
+
 
 def n_per_deg2(obj,deg2=1., req_mags=[24.,23.4,22.5],name=''):
     '''compute number density in each bin for each band mag [18,requirement]

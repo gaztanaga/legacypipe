@@ -34,9 +34,18 @@ plots.radec(d.ref.data['tractor'], outname=os.path.join(d.outdir,'radec_decals.p
 plots.radec(d.test.data['tractor'], outname=os.path.join(d.outdir,'radec_bass.png'))
 
 # Clean and psf 
-d.apply_cut(['clean','psf'])
+d.apply_cut(['clean'])
 plots.confusion_matrix(d.ref.data['tractor'],d.test.data['tractor'], outname=os.path.join(d.outdir,'conf.png'),\
                        ref_name='DECaLS',test_name='BASS_MzLS')
+plots.stacked_confusion_matrix(d.ref.data['tractor'],d.test.data['tractor'],\
+                               d.ref.data['extra'],d.test.data['extra'],\
+                               ref_name='DECaLS',test_name='BASS_MzLS',\
+                               outname=os.path.join(d.outdir,'conf_stacked.png'))
+
+plots.delta_mag_vs_mag(d.ref.data['extra'],d.test.data['extra'], outname=os.path.join(d.outdir,'delta_mag.png'))
+plots.chi_v_gaussian(d.ref.data['tractor'],d.test.data['tractor'],\
+                     d.ref.data['extra'],d.test.data['extra'],\
+                     low=-8.,hi=8., outname=os.path.join(d.outdir,'chi.png'))
 
 #plots.nobs(d.test_matched, name='BASS_MzLS')
 #plots.radec(d.test_missed, name='Missed_Test')
@@ -56,8 +65,6 @@ plots.confusion_matrix(d.ref.data['tractor'],d.test.data['tractor'], outname=os.
 ## union of default + PSF
 #d.ref_matched.apply_mask_by_names(['current','psf'])
 #d.test_matched.apply_mask_by_names(['current','psf'])
-#plots.delta_mag_vs_mag(d.ref_matched,d.test_matched, name='UnionDefaultPsf')
-#plots.chi_v_gaussian(d.ref_matched,d.test_matched, low=-8.,hi=8., name='UnionDefaultPsf')
 #
 ## Change mask to default + PSF
 #d.ref_matched.apply_mask_by_names(['default','psf'])
