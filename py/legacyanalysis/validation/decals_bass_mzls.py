@@ -42,7 +42,8 @@ plots.stacked_confusion_matrix(d.ref.data['tractor'],d.test.data['tractor'],\
                                ref_name='DECaLS',test_name='BASS_MzLS',\
                                outname=os.path.join(d.outdir,'conf_stacked.png'))
 
-plots.delta_mag_vs_mag(d.ref.data['extra'],d.test.data['extra'], outname=os.path.join(d.outdir,'delta_mag.png'))
+plots.delta_mag_vs_mag(d.ref.data['extra'],d.test.data['extra'], ylim=[-0.5,0.5],\
+                       outname=os.path.join(d.outdir,'delta_mag.png'))
 plots.chi_v_gaussian(d.ref.data['tractor'],d.test.data['tractor'],\
                      d.ref.data['extra'],d.test.data['extra'],\
                      low=-8.,hi=8., outname=os.path.join(d.outdir,'chi.png'))

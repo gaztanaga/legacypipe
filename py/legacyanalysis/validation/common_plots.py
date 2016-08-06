@@ -212,16 +212,14 @@ def plot_stack(cm_stack,stack_names,all_names, \
 def stacked_confusion_matrix(ref_tractor,test_tractor,\
                              ref_extra,test_extra,\
                              ref_name='ref',test_name='test', outname='test.png'):
-    types= ['PSF ', 'SIMP', 'EXP ', 'DEV ', 'COMP']
     cm_stack,stack_names=[],[]
     rbins= np.array([18.,20.,22.,23.,24.])
     for rmin,rmax in zip(rbins[:-1],rbins[1:]):
         # master cut
         br_cut= np.all((ref_extra['mag'][:,2] > rmin,ref_extra['mag'][:,2] <= rmax),axis=0)
         stack_names+= ["%d < r <= %d" % (int(rmin),int(rmax))]
-        cm,ans_names,all_names= create_stack(np.array(['PSF ']*len(ref_tractor)),
-                                             test_tractor['type'], \
-                                             types=types)
+        cm,ans_names,all_names= create_stack(np.array(['PSF']*len(ref_tractor)),
+                                             test_tractor['type'])
         cm_stack+= [cm]
     plot_stack(cm_stack, stack_names,all_names, \
                ref_name=ref_name,test_name=test_name,outname=outname)
@@ -280,23 +278,27 @@ def chi_v_gaussian(ref_tractor,test_tractor,\
             else: xlab=ax[cnt].set_xlabel('%s' % band, **kwargs.ax)
             ax[cnt].set_ylim(0,0.6)
             ax[cnt].set_xlim(low,hi)
+            ti=ax[cnt].set_title("%.1f < %s < %.1f" % (b_low,band,b_hi),**kwargs.ax)
         ylab=ax[0].set_ylabel('PDF', **kwargs.ax)
-        ti=ax[1].set_title("%s (%.1f <= %s < %.1f)" % (type,b_low,band,b_hi),**kwargs.ax)
-        #put stats in suptitle
-        plt.savefig(outname, bbox_extra_artists=[ti,xlab,ylab], **kwargs.save)
+        # Need unique name
+        name=os.path.basename(outname).replace('.ipynb','')+'_%d-%d.png' % (b_low,b_hi) 
+        plt.savefig(os.path.join(os.path.dirname(outname),name), \
+                    bbox_extra_artists=[ti,xlab,ylab], **kwargs.save)
         plt.close()
 
 def delta_mag_vs_mag(ref_extra,test_extra, ref_name='ref',test_name='test',\
-                     outname='test.png'):
+                     ylim=None,outname='test.png'):
     fig,ax=plt.subplots(1,3,figsize=(9,3),sharey=True)
     plt.subplots_adjust(wspace=0.25)
     for cnt,iband in zip(range(3),[1,2,4]):
         delta= test_extra['mag'][:,iband]- ref_extra['mag'][:,iband]
-        ax[cnt].scatter(ref_extra['mag'][:,iband],delta,\
+        ax[cnt].scatter(ref_extra['mag'][:,iband],delta/ref_extra['mag'][:,iband],\
                         c='b',edgecolor='b',s=5) #,c='none',lw=2.)
     for cnt,band in zip(range(3),['g','r','z']):
         xlab=ax[cnt].set_xlabel('%s AB' % band, **kwargs.ax)
-        ax[cnt].set_ylim(-0.1,0.1)
+        if ylim is None:
+            ax[cnt].set_ylim(-0.1,0.1)
+        else: ax[cnt].set_ylim(ylim)
         ax[cnt].set_xlim(18,26)
     ylab=ax[0].set_ylabel('mag (%s) - mag(%s)' % (test_name,ref_name), **kwargs.ax)
     plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
