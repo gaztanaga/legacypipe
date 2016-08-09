@@ -26,6 +26,7 @@ args = parser.parse_args()
 # Get data for Matched sources
 d= get_matched_dataset(args.decals_list, args.bassmos_list, \
                        comparison='bmd',debug=False)
+
 # All matched 
 d.apply_cut(['all'])
 plots.nobs(d.ref.data['tractor'], outname=os.path.join(d.outdir,'nobs_decals.png'))

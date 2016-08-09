@@ -20,7 +20,9 @@ import numpy as np
 
 from astropy.io import fits
 from astropy.table import vstack, Table, Column
-from astrometry.libkd.spherematch import match_radec
+from astropy import units
+from astropy.coordinates import SkyCoord
+#from astrometry.libkd.spherematch import match_radec
 
 import legacyanalysis.validation.pathnames as myio
 
@@ -204,28 +206,24 @@ class Matched_DataSet(object):
     def do_matching(self):
         '''matches test ra,dec to ref ra,dec
         Returns dict of boolean arrays for the matched and missed samples'''    
-        m1, m2, d12 = match_radec(self.ref.tractor['ra'].data.copy(), self.ref.tractor['dec'].data.copy(),\
-                                  self.test.tractor['ra'].data.copy(), self.test.tractor['dec'].data.copy(),\
-                                  1.0/3600.0)
-        #print("len(m1)=%d, len(m2)=%d" % (len(m1),len(m2)))
-        print("Matched: %d/%d objects" % (m1.size,len(self.ref.tractor)))
-        miss1 = np.delete(np.arange(len(self.ref.tractor)), m1, axis=0)
-        miss2 = np.delete(np.arange(len(self.test.tractor)), m2, axis=0)
-        # Indices to bool array
-        #ref_rows= len(self.ref.tractor)
-        #test_rows= len(self.test.tractor)
-        #junk_ref= self.indices2bool(m1,rows=ref_rows)
-        #junk_test= self.indices2bool(m2,rows=test_rows)
-        #print('N true, junk_ref=%d, junk_test=%d' % (np.where(junk_ref)[0].size,np.where(junk_test)[0].size))
-        #print('exiting early')
-        #sys.exit() 
-        #return dict(ref_imatch= self.indices2bool(m1,rows=ref_rows),\
-        #            ref_imiss= self.indices2bool(miss1,rows=ref_rows),\
-        #            test_imatch= self.indices2bool(m2,rows=test_rows),\
-        #            test_imiss= self.indices2bool(miss2,rows=test_rows))
-        return dict(ref_imatch= m1,\
+        #m1, m2, d12 = match_radec(self.ref.tractor['ra'].data.copy(), self.ref.tractor['dec'].data.copy(),\
+        #                          self.test.tractor['ra'].data.copy(), self.test.tractor['dec'].data.copy(),\
+        #                          1.0/3600.0,nearest=True)
+        #miss1 = np.delete(np.arange(len(self.ref.tractor)), m1, axis=0)
+        #miss2 = np.delete(np.arange(len(self.test.tractor)), m2, axis=0)
+        #print("astrometry Matched: %d/%d objects" % (m1.size,len(self.ref.tractor)))
+        cat1 = SkyCoord(ra=self.ref.tractor['ra'].data*units.degree, dec=self.ref.tractor['dec'].data*units.degree)  
+        cat2 = SkyCoord(ra=self.test.tractor['ra'].data*units.degree, dec=self.test.tractor['dec'].data*units.degree) 
+        idx, d2d, d3d = cat1.match_to_catalog_3d(cat2)  
+        b= np.array(d2d) <= 1./3600
+        idx= np.array(idx)[b]
+        iref= np.arange(len(self.ref.tractor))[b]
+        print("Matched: %d/%d objects" % (iref.size,len(self.ref.tractor)))
+        miss1 = np.delete(np.arange(len(self.ref.tractor)), iref, axis=0)
+        miss2 = np.delete(np.arange(len(self.test.tractor)), idx, axis=0)
+        return dict(ref_imatch= iref,\
                     ref_imiss= miss1, \
-                    test_imatch= m2,\
+                    test_imatch= idx,\
                     test_imiss= miss2)
 
     def indices2bool(self,indices,rows=None):
@@ -250,6 +248,7 @@ def get_matched_dataset(decals_list, bassmos_list, \
     # Return saved file if exists
     fn= myio.get_checkpt(comparison) 
     if os.path.exists(fn): 
+        print('WARNING: using existing file: %s' % fn)
         return myio.read_checkpt(comparison)
     # Compute and save
     else: 
