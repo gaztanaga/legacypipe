@@ -43,7 +43,7 @@ def bin_up(data_bin_by,data_for_percentile, bin_minmax=(18.,26.),nbins=20):
     return vals
 
 # Main plotting functions 
-def nobs(tractor, outname='test.png'):
+def nobs(tractor, outname='test.png',show=False):
     '''make histograms of nobs so can compare depths of g,r,z between the two catalogues
     tractor -- Tractor catalogue in a table'''   
     hi= np.max(tractor['decam_nobs'][:,[1,2,4]])
@@ -53,18 +53,20 @@ def nobs(tractor, outname='test.png'):
                    bins=hi+1,normed=True,cumulative=True,align='mid')
         xlab=ax[i].set_xlabel('nobs %s' % band, **kwargs.ax)
         ylab=ax[i].set_ylabel('CDF', **kwargs.ax)
-    plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
-    plt.close()
+    if show == False:
+        plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
+        plt.close()
 
-def radec(tractor,outname='test.png'): 
+def radec(tractor,outname='test.png',show=False): 
     '''ra,dec distribution of objects
     obj -- Single_TractorCat()'''
     plt.scatter(tractor['ra'], tractor['dec'], \
                 edgecolor='b',c='none',lw=1.)
     xlab=plt.xlabel('RA', **kwargs.ax)
     ylab=plt.ylabel('DEC', **kwargs.ax)
-    plt.savefig(outname,bbox_extra_artists=[xlab,ylab], **kwargs.save)
-    plt.close()
+    if show == False:
+        plt.savefig(outname,bbox_extra_artists=[xlab,ylab], **kwargs.save)
+        plt.close()
 
 
 def hist_types(obj, name=''):
@@ -138,7 +140,7 @@ def create_confusion_matrix(ref_tractor,test_tractor):
     return cm,types
 
 
-def confusion_matrix(ref_tractor,test_tractor, outname='test.png',\
+def confusion_matrix(ref_tractor,test_tractor, outname='test.png',show=False,\
                      ref_name='ref',test_name='test'):
     '''plot confusion matrix
     ref_obj,test_obj -- reference,test Single_TractorCat()'''
@@ -157,8 +159,9 @@ def confusion_matrix(ref_tractor,test_tractor, outname='test.png',\
                 plt.text(col,row,'%.2f' % cm[row,col],va='center',ha='center',color='yellow')
             else:
                 plt.text(col,row,'%.2f' % cm[row,col],va='center',ha='center',color='black')
-    plt.savefig(outname,bbox_extra_artists=[xlab,ylab], **kwargs.save)
-    plt.close()
+    if show == False:
+        plt.savefig(outname,bbox_extra_artists=[xlab,ylab], **kwargs.save)
+        plt.close()
 
 def create_stack(answer_type,predict_type, types=['PSF','SIMP','EXP','DEV','COMP'],slim=True):
     '''compares classifications of matched objects, returns 2D array which is conf matrix and xylabels
@@ -182,7 +185,7 @@ def create_stack(answer_type,predict_type, types=['PSF','SIMP','EXP','DEV','COMP
 
 def plot_stack(cm_stack,stack_names,all_names, \
                ref_name='ref',test_name='test',\
-               outname='test.png'):
+               outname='test.png',show=False):
     '''cm_stack -- list of single row confusion matrices
     stack_names -- list of same len as cm_stack, names for each row of cm_stack'''
     # combine list into single cm
@@ -206,12 +209,14 @@ def plot_stack(cm_stack,stack_names,all_names, \
             #if np.isnan(cm[row,col]): 
             #    plt.text(col,row,'n/a',va='center',ha='center')
             #else: plt.text(col,row,'%.2f' % cm[row,col],va='center',ha='center')
-    plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
-    plt.close()
+    if show == False:
+        plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
+        plt.close()
 
 def stacked_confusion_matrix(ref_tractor,test_tractor,\
                              ref_extra,test_extra,\
-                             ref_name='ref',test_name='test', outname='test.png'):
+                             ref_name='ref',test_name='test', \
+                             outname='test.png',show=False):
     cm_stack,stack_names=[],[]
     rbins= np.array([18.,20.,22.,23.,24.])
     for rmin,rmax in zip(rbins[:-1],rbins[1:]):
@@ -222,7 +227,7 @@ def stacked_confusion_matrix(ref_tractor,test_tractor,\
                                              test_tractor['type'])
         cm_stack+= [cm]
     plot_stack(cm_stack, stack_names,all_names, \
-               ref_name=ref_name,test_name=test_name,outname=outname)
+               ref_name=ref_name,test_name=test_name,outname=outname,show=show)
 
 
 def matched_dist(obj,dist, name=''):
@@ -243,7 +248,7 @@ def matched_dist(obj,dist, name=''):
 
 def chi_v_gaussian(ref_tractor,test_tractor,\
                    ref_extra,test_extra,\
-                   low=-8.,hi=8., outname='test.png'):
+                   low=-8.,hi=8., outname='test.png',show=False):
     # Compute Chi
     chi={} 
     for band,iband in zip(['g','r','z'],[1,2,4]):
@@ -282,12 +287,13 @@ def chi_v_gaussian(ref_tractor,test_tractor,\
         ylab=ax[0].set_ylabel('PDF', **kwargs.ax)
         # Need unique name
         name=os.path.basename(outname).replace('.ipynb','')+'_%d-%d.png' % (b_low,b_hi) 
-        plt.savefig(os.path.join(os.path.dirname(outname),name), \
-                    bbox_extra_artists=[ti,xlab,ylab], **kwargs.save)
-        plt.close()
+        if show == False:
+            plt.savefig(os.path.join(os.path.dirname(outname),name), \
+                        bbox_extra_artists=[ti,xlab,ylab], **kwargs.save)
+            plt.close()
 
 def delta_mag_vs_mag(ref_extra,test_extra, ref_name='ref',test_name='test',\
-                     ylim=None,outname='test.png'):
+                     ylim=None,outname='test.png',show=False):
     fig,ax=plt.subplots(1,3,figsize=(9,3),sharey=True)
     plt.subplots_adjust(wspace=0.25)
     for cnt,iband in zip(range(3),[1,2,4]):
@@ -301,8 +307,9 @@ def delta_mag_vs_mag(ref_extra,test_extra, ref_name='ref',test_name='test',\
         else: ax[cnt].set_ylim(ylim)
         ax[cnt].set_xlim(18,26)
     ylab=ax[0].set_ylabel('mag (%s) - mag(%s)' % (test_name,ref_name), **kwargs.ax)
-    plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
-    plt.close()
+    if show == False:
+        plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
+        plt.close()
 
 
 def n_per_deg2(obj,deg2=1., req_mags=[24.,23.4,22.5],name=''):
