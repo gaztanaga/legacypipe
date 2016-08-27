@@ -33,7 +33,7 @@ def get_outdir(comparison):
     make_dir(dir)
     return dir
 
-def get_indir(comparison,indir='/project/projectdirs/desi/imaging/data/validation'):
+def get_indir(comparison,indir='/project/projectdirs/desi/users/burleigh/theValidator_root'):
     '''
     Returns the absolute path to data for desired comparison
     *comparison* : string, which comparison you are doing: bmd (bass,mosaic,decals), cosmos (Johans/Jeffs comparisons), dr23 (Johans dr2 dr3 comparison) 
