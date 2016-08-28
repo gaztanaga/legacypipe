@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""do DECaLS to BASS/MzLS comparison
+"""Decals BassMzls comparison
 """
 
 from __future__ import division, print_function

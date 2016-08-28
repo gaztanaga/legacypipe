@@ -33,7 +33,7 @@ def get_outdir(comparison):
     make_dir(dir)
     return dir
 
-def get_indir(comparison,indir='/project/projectdirs/desi/users/burleigh/theValidator_root'):
+def get_indir(comparison,indir='/project/projectdirs/desi/users/burleigh/theValidator_root/input_data'):
     '''
     Returns the absolute path to data for desired comparison
     *comparison* : string, which comparison you are doing: bmd (bass,mosaic,decals), cosmos (Johans/Jeffs comparisons), dr23 (Johans dr2 dr3 comparison) 
@@ -63,5 +63,6 @@ def dump_checkpt(data,comparison):
     fout=open(fn,'w')
     dump(data,fout)
     fout.close()
+    print 'wrote: %s' % fn
 
 

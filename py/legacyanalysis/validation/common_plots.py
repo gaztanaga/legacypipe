@@ -276,7 +276,7 @@ def chi_v_gaussian(ref_tractor,test_tractor,\
         plt.subplots_adjust(wspace=0.25)
         for cnt,band in zip(range(3),['g','r','z']):
             ax[cnt].step(binc[band],hist[band], where='mid',c='b',lw=2)
-            ax[cnt].plot(xvals,G.pdf(xvals))
+            ax[cnt].plot(xvals,G.pdf(xvals),c='g',label=r'$N(0,1)$')
         #labels
         for cnt,band in zip(range(3),['g','r','z']):
             if band == 'r': xlab=ax[cnt].set_xlabel(r'%s  $(F_{d}-F_{bm})/\sqrt{\sigma^2_{d}+\sigma^2_{bm}}$' % band, **kwargs.ax)
@@ -285,6 +285,7 @@ def chi_v_gaussian(ref_tractor,test_tractor,\
             ax[cnt].set_xlim(low,hi)
             ti=ax[cnt].set_title("%.1f < %s < %.1f" % (b_low,band,b_hi),**kwargs.ax)
         ylab=ax[0].set_ylabel('PDF', **kwargs.ax)
+        ax[0].legend(loc='upper left',fontsize='medium')
         # Need unique name
         name=os.path.basename(outname).replace('.ipynb','')+'_%d-%d.png' % (b_low,b_hi) 
         if show == False:

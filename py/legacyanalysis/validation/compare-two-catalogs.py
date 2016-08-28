@@ -1,5 +1,7 @@
 from __future__ import print_function
-import pylab as plt
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import numpy as np
 from glob import glob
 import os
@@ -7,9 +9,9 @@ import re
 from astrometry.util.fits import fits_table, merge_tables
 from astrometry.libkd.spherematch import match_radec
 from astrometry.util.plotutils import PlotSequence
+#
 from tractor.brightness import NanoMaggies
 import scipy.stats
-import sys
 
 '''
 This is a little script for comparing two directories full of tractor
@@ -26,12 +28,13 @@ def main():
                         help='Prefix for plot filenames; default "%default"')
     parser.add_argument('--match', default=1.0,
                         help='Astrometric cross-match distance in arcsec')
-    parser.add_argument('dir1', help='First directory to compare')
-    parser.add_argument('dir2', help='Second directory to compare')
+    parser.add_argument('--dir1', help='First directory to compare')
+    parser.add_argument('--dir2', help='Second directory to compare')
+    parser.add_argument('--outdir', help='where save plots')
 
     opt = parser.parse_args()
     
-    ps = PlotSequence(opt.plot_prefix)
+    #ps = PlotSequence(opt.plot_prefix)
 
     name1 = opt.name1
     if name1 is None:
@@ -80,31 +83,31 @@ def main():
     I,J,d = match_radec(cat1.ra, cat1.dec, cat2.ra, cat2.dec, opt.match/3600.,
                         nearest=True)
     print(len(I), 'matched')
-    matched1 = cat1[I]
-    matched2 = cat2[J]
 
-def all(matched1,matched2,d, name1='ref',name2='test'):
-    tt= 'Comparing %s to %s' % (name1, name2)
     plt.clf()
     plt.hist(d * 3600., 100)
     plt.xlabel('Match distance (arcsec)')
     plt.title(tt)
-    plt.savefig(os.path.join(matched1.outdir,'sep_hist.png'))
+    #ps.savefig()
+    plt.savefig(os.path.join(opt.outdir,'match_dist.png'))
     plt.close()
 
+    matched1 = cat1[I]
+    matched2 = cat2[J]
+
     for iband,band,cc in [(1,'g','g'),(2,'r','r'),(4,'z','m')]:
-        K = np.flatnonzero((matched1.t['decam_flux_ivar'][:,iband] > 0) *
-                           (matched2.t['decam_flux_ivar'][:,iband] > 0))
+        K = np.flatnonzero((matched1.decam_flux_ivar[:,iband] > 0) *
+                           (matched2.decam_flux_ivar[:,iband] > 0))
         
         print('Median mw_trans', band, 'is',
-              np.median(matched1.t['decam_mw_transmission'][:,iband]))
+              np.median(matched1.decam_mw_transmission[:,iband]))
         
         plt.clf()
-        plt.errorbar(matched1.t['decam_flux'][K,iband],
-                     matched2.t['decam_flux'][K,iband],
+        plt.errorbar(matched1.decam_flux[K,iband],
+                     matched2.decam_flux[K,iband],
                      fmt='.', color=cc,
-                     xerr=1./np.sqrt(matched1.t['decam_flux_ivar'][K,iband]),
-                     yerr=1./np.sqrt(matched2.t['decam_flux_ivar'][K,iband]),
+                     xerr=1./np.sqrt(matched1.decam_flux_ivar[K,iband]),
+                     yerr=1./np.sqrt(matched2.decam_flux_ivar[K,iband]),
                      alpha=0.1,
                      )
         plt.xlabel('%s flux: %s' % (name1, band))
@@ -112,11 +115,11 @@ def all(matched1,matched2,d, name1='ref',name2='test'):
         plt.plot([-1e6, 1e6], [-1e6,1e6], 'k-', alpha=1.)
         plt.axis([-100, 1000, -100, 1000])
         plt.title(tt)
-        plt.savefig(os.path.join(matched1.outdir,'%s_fluxerr.png' % band))
+        #ps.savefig()
+        plt.savefig(os.path.join(opt.outdir,'%s_fluxflux.png' % band))
         plt.close()
 
-    print("exiting early")
-    sys.exit()
+
     for iband,band,cc in [(1,'g','g'),(2,'r','r'),(4,'z','m')]:
         good = ((matched1.decam_flux_ivar[:,iband] > 0) *
                 (matched2.decam_flux_ivar[:,iband] > 0))
@@ -144,7 +147,9 @@ def all(matched1,matched2,d, name1='ref',name2='test'):
         plt.axhline(0, color='k', alpha=0.5)
         plt.axis([24, 16, -10, 10])
         plt.title(tt)
-        ps.savefig()
+        #ps.savefig()
+        plt.savefig(os.path.join(opt.outdir,'%s_fluxdeltaflux.png' % band))
+        plt.close()
 
     plt.clf()
     lp,lt = [],[]
@@ -188,13 +193,15 @@ def all(matched1,matched2,d, name1='ref',name2='test'):
         bins.append((blo+bhi)/2.)
         gaussint.append(c)
     plt.plot(bins, gaussint, 'k-', lw=2, alpha=0.5)
-
+    
     plt.title(tt)
     plt.xlabel('Flux difference / error (sigma)')
     plt.axvline(0, color='k', alpha=0.1)
     plt.ylim(0, 0.45)
     plt.legend(lp, lt, loc='upper right')
-    ps.savefig()
+    #ps.savefig()
+    plt.savefig(os.path.join(opt.outdir,'grz_ratio_fluxerr.png'))
+    plt.close()
         
         
     for iband,band,cc in [(1,'g','g'),(2,'r','r'),(4,'z','m')]:
@@ -223,7 +230,9 @@ def all(matched1,matched2,d, name1='ref',name2='test'):
         plt.plot([-1e6, 1e6], [-1e6,1e6], 'k-', alpha=1.)
         plt.axis([24, 16, 24, 16])
         plt.title(tt)
-        ps.savefig()
+        #ps.savefig()
+        plt.savefig(os.path.join(opt.outdir,'%s_magmag.png' % band))
+        plt.close()
 
         plt.clf()
         plt.errorbar(mag1[K], mag2[K] - mag1[K], fmt='.', color=cc,
@@ -234,7 +243,9 @@ def all(matched1,matched2,d, name1='ref',name2='test'):
         plt.axhline(0., color='k', alpha=1.)
         plt.axis([24, 16, -1, 1])
         plt.title(tt)
-        ps.savefig()
+        #ps.savefig()
+        plt.savefig(os.path.join(opt.outdir,'%s_magdeltamag.png' % band))
+        plt.close()
 
         magbins = np.arange(16, 24.001, 0.5)
         
@@ -250,7 +261,9 @@ def all(matched1,matched2,d, name1='ref',name2='test'):
         plt.axhline(0., color='k', alpha=1.)
         plt.axis([24, 16, -10, 10])
         plt.title(tt)
-        ps.savefig()
+        #ps.savefig()
+        plt.savefig(os.path.join(opt.outdir,'%s_deltamag_err.png' % band))
+        plt.close()
 
         y = (mag2 - mag1) / np.hypot(magerr1, magerr2)
         
@@ -350,7 +363,9 @@ def all(matched1,matched2,d, name1='ref',name2='test'):
 
         plt.axis([24.1, 16, -6, 6])
         plt.title(tt)
-        ps.savefig()
+        #ps.savefig()
+        plt.savefig(os.path.join(opt.outdir,'%s_deltamag_errbars.png' % band))
+        plt.close()
 
         #magbins = np.append([16, 18], np.arange(20, 24.001, 0.5))
         if band == 'g':
@@ -398,7 +413,9 @@ def all(matched1,matched2,d, name1='ref',name2='test'):
         plt.legend(lp, lt)
         plt.title(tt)
         plt.xlim(slo,shi)
-        ps.savefig()
+        #ps.savefig()
+        plt.savefig(os.path.join(opt.outdir,'%s_stephist.png' % band))
+        plt.close()
 
         bincenters = b[:-1] + (b[1]-b[0])/2.
         plt.clf()
@@ -410,7 +427,9 @@ def all(matched1,matched2,d, name1='ref',name2='test'):
         plt.legend(lp, lt)
         plt.title(tt)
         plt.xlim(slo,shi)
-        ps.savefig()
+        #ps.savefig()
+        plt.savefig(os.path.join(opt.outdir,'%s_curvehist.png' % band))
+        plt.close()
         
         
 if __name__ == '__main__':
