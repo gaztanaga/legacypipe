@@ -102,6 +102,7 @@ export OMP_NUM_THREADS=$procs
 module load mpi4py-hpcp
 srun -n 4 -c $OMP_NUM_THREADS python runbrick_mpi4py.py \
      --brick_list dr3_4bricks.txt --outdir $outdir \
+     --jobid $SLURM_JOBID \
      --threads $OMP_NUM_THREADS --zoom 1400 1800 1400 1800
 
 

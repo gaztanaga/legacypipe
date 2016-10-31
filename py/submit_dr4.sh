@@ -98,7 +98,7 @@ srun -n 1 -c $OMP_NUM_THREADS python legacypipe/runbrick.py \
      --skip \
      --threads $OMP_NUM_THREADS \
      --checkpoint $oudir/checkpoints/${bri}/${brick}.pickle \
-     --pickle "$outdir/${bri}/runbrick-%(brick)s-%%(stage)s.pickle" \
+     --pickle "$outdir/pickles/${bri}/runbrick-%(brick)s-%%(stage)s.pickle" \
      --outdir $outdir --nsigma 6 \
      --no-wise --zoom 1400 1600 1400 1600 \
      >> $log 2>&1
