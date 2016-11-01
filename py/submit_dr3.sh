@@ -16,9 +16,8 @@ echo ########
 
 #bcast
 source /scratch2/scratchdirs/kaylanb/yu-bcase/activate.sh
-did_bcast=yes
-outdir=$SCRATCH/dr3/legacypipe/py/runs/decam_dr3/bcast${did_bcast}
-#outdir=$SCRATCH/dr3/legacypipe/py/runs/decam_dr3/${SLURM_JOBID}${did_bcast}
+outdir=testing_bcast_mpi
+#outdir=$SCRATCH/dr3/legacypipe/py/runs/decam_dr3/bcast${did_bcast}
 
 # From Aaron's cpy to edison scratch a few weeks ago
 export UNWISE_COADDS_DIR=/scratch1/scratchdirs/desiproc/unwise-coadds/fulldepth:/scratch1/scratchdirs/desiproc/unwise-coadds
@@ -57,7 +56,6 @@ ulimit -a
 
 # Point to Legacypipe
 # git checkout 6fad8727dc78  --> the latest version before dr4 refactoring
-export PYTHONPATH=.:${PYTHONPATH}
 
 module unload tractor-hpcp
 #export PYTHONPATH=~dstn/tractor:.:${PYTHONPATH}
@@ -65,7 +63,7 @@ module unload tractor-hpcp
 # bashrc to edison and tractor_procution == yes
 # git clone tractor repo
 # cd tractor; git checkout fe9babf -b dustins_version_dr3; make
-export PYTHONPATH=/scratch2/scratchdirs/kaylanb/dr3/tractor:${PYTHONPATH}
+export PYTHONPATH=.:/scratch2/scratchdirs/kaylanb/dr3/tractor:${PYTHONPATH}
 
 
 
@@ -100,10 +98,10 @@ export PYTHONPATH=/scratch2/scratchdirs/kaylanb/dr3/tractor:${PYTHONPATH}
 procs=6
 export OMP_NUM_THREADS=$procs
 module load mpi4py-hpcp
-srun -n 4 -c $OMP_NUM_THREADS python runbrick_mpi4py.py \
+srun -n 4 -N 1 -c $OMP_NUM_THREADS python runbrick_mpi4py.py \
      --brick_list dr3_4bricks.txt --outdir $outdir \
      --jobid $SLURM_JOBID \
-     --threads $OMP_NUM_THREADS --zoom 1400 1800 1400 1800
+     --threads $OMP_NUM_THREADS --zoom 1400 1600 1400 1600
 
 
 

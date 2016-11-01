@@ -344,6 +344,9 @@ def main():
 
     elif opt.region == 'mzls':
         dlo,dhi = 30., 90.
+    elif opt.region == 'mzls_v2v3':
+        rlo,rhi = 100., 105.
+        dlo,dhi = 35., 40.
 
         
     if opt.mindec is not None:

@@ -2,7 +2,7 @@
 
 #SBATCH -p debug
 #SBATCH -N 1
-#SBATCH -t 00:10:00
+#SBATCH -t 00:05:00
 #SBATCH -J dr4
 #SBATCH -o dr4.o%j
 #SBATCH --mail-user=kburleigh@lbl.gov
@@ -53,7 +53,6 @@ ulimit -a
 
 # Point to Legacypipe
 # git checkout 6fad8727dc78  --> the latest version before dr4 refactoring
-export PYTHONPATH=.:${PYTHONPATH}
 
 module unload tractor-hpcp
 #export PYTHONPATH=~dstn/tractor:.:${PYTHONPATH}
@@ -61,7 +60,7 @@ module unload tractor-hpcp
 # bashrc to edison and tractor_procution == yes
 # git clone tractor repo
 # cd tractor; git checkout fe9babf -b dustins_version_dr3; make
-export PYTHONPATH=/scratch2/scratchdirs/kaylanb/dr3/tractor:${PYTHONPATH}
+export PYTHONPATH=.:/scratch2/scratchdirs/kaylanb/dr3/tractor:${PYTHONPATH}
 
 
 
@@ -97,7 +96,7 @@ srun -n 1 -c $OMP_NUM_THREADS python legacypipe/runbrick.py \
      --brick $brick \
      --skip \
      --threads $OMP_NUM_THREADS \
-     --checkpoint $oudir/checkpoints/${bri}/${brick}.pickle \
+     --checkpoint $outdir/checkpoints/${bri}/${brick}.pickle \
      --pickle "$outdir/pickles/${bri}/runbrick-%(brick)s-%%(stage)s.pickle" \
      --outdir $outdir --nsigma 6 \
      --no-wise --zoom 1400 1600 1400 1600 \
