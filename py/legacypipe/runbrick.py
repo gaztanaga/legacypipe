@@ -2092,6 +2092,7 @@ def stage_writecat(
             dm = vega_to_ab['w%i' % band]
             fluxfactor = 10.** (dm / -2.5)
             c = 'w%i_nanomaggies' % band
+            print('WISE.get_columns()=',WISE.get_columns())
             WISE.set(c, WISE.get(c) * fluxfactor)
             if WISE_T is not None and band <= 2:
                 WISE_T.set(c, WISE_T.get(c) * fluxfactor)

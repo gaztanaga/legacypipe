@@ -1,13 +1,15 @@
 #!/bin/bash -l
 
 #SBATCH -p debug
-#SBATCH -N 1
-#SBATCH -t 00:10:00
-#SBATCH -J dr3
-#SBATCH -o dr3.o%j
+#SBATCH -N 7
+#SBATCH -t 00:30:00
+#SBATCH -J mpiv3
+#SBATCH -o mpiv3.o%j
 #SBATCH --mail-user=kburleigh@lbl.gov
 #SBATCH --mail-type=END,FAIL
 #SBATCH -L SCRATCH
+
+ver=3
 
 set -x
 echo ########
@@ -16,7 +18,7 @@ echo ########
 
 #bcast
 source /scratch2/scratchdirs/kaylanb/yu-bcase/activate.sh
-outdir=testing_bcast_mpi
+outdir=/scratch2/scratchdirs/kaylanb/dr3/production/mpi_mzls_v$ver
 #outdir=$SCRATCH/dr3/legacypipe/py/runs/decam_dr3/bcast${did_bcast}
 
 # From Aaron's cpy to edison scratch a few weeks ago
@@ -28,7 +30,8 @@ export UNWISE_COADDS_TIMERESOLVED_DIR=/scratch1/scratchdirs/desiproc/unwise-coad
 #/scratch1/scratchdirs/desiproc/unwise-coadds/w3w4
 
 #export LEGACY_SURVEY_DIR=/global/cscratch1/sd/desiproc/dr3
-export LEGACY_SURVEY_DIR=/scratch2/scratchdirs/kaylanb/dr3/desiproc-dr3-template
+#export LEGACY_SURVEY_DIR=/scratch2/scratchdirs/kaylanb/dr3/desiproc-dr3-template
+export LEGACY_SURVEY_DIR=/scratch2/scratchdirs/kaylanb/dr3/desiproc-dr4v${ver}-template
 export DUST_DIR=/project/projectdirs/cosmo/work/decam/modules/all/dust/v0_0
 # above is equivalent to: module load dust/v0_0
 #export DUST_DIR=/global/cscratch1/sd/desiproc/dust/v0_0
@@ -95,13 +98,22 @@ export PYTHONPATH=.:/scratch2/scratchdirs/kaylanb/dr3/tractor:${PYTHONPATH}
 #     --no-write \
 ##########################################
 
-procs=6
-export OMP_NUM_THREADS=$procs
+if [ "$NERSC_HOST" == "cori" ]; then
+    cores=32
+elif [ "$NERSC_HOST" == "edison" ]; then
+    cores=24
+fi
+let cores*=${SLURM_JOB_NUM_NODES}
+
+tasks=25
+threads=6
+export OMP_NUM_THREADS=$threads
 module load mpi4py-hpcp
-srun -n 4 -N 1 -c $OMP_NUM_THREADS python runbrick_mpi4py.py \
-     --brick_list dr3_4bricks.txt --outdir $outdir \
+srun -n $tasks -N ${SLURM_JOB_NUM_NODES} -c $OMP_NUM_THREADS python runbrick_mpi4py.py \
+     --brick_list bricks_mzls_v2v3_50.txt --outdir $outdir \
      --jobid $SLURM_JOBID \
-     --threads $OMP_NUM_THREADS --zoom 1400 1600 1400 1600
+     --threads $OMP_NUM_THREADS 
+#--zoom 1400 1600 1400 1600
 
 
 

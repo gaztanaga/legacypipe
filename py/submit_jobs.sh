@@ -1,10 +1,10 @@
 #!/bin/bash
 export ver="2"
-#export outdir="/scratch2/scratchdirs/kaylanb/dr3/runs/mzls_v${ver}"
-export outdir="testing"
-export dr="/scratch2/scratchdirs/kaylanb/dr3/legacypipe/py/in_progress"
+export outdir="/scratch2/scratchdirs/kaylanb/dr3/production/mzls_v${ver}"
+#export outdir="testing"
+export dr="${outdir}/in_progress"
 mkdir -p $dr $outdir
-for brick in `cat brick_list.txt`;do
+for brick in `cat bricks_mzls_v2v3_50.txt`;do
     export brick="$brick"
     bri=$(echo $brick | head -c 3)
     tractor_fits=$outdir/tractor/$bri/tractor-$brick.fits

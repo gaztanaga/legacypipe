@@ -1,10 +1,10 @@
 #!/bin/bash -l
 
-#SBATCH -p debug
+#SBATCH -p regular
 #SBATCH -N 1
-#SBATCH -t 00:05:00
-#SBATCH -J dr4
-#SBATCH -o dr4.o%j
+#SBATCH -t 02:00:00
+#SBATCH -J v3
+#SBATCH -o v3.o%j
 #SBATCH --mail-user=kburleigh@lbl.gov
 #SBATCH --mail-type=END,FAIL
 #SBATCH -L SCRATCH,project
@@ -99,8 +99,9 @@ srun -n 1 -c $OMP_NUM_THREADS python legacypipe/runbrick.py \
      --checkpoint $outdir/checkpoints/${bri}/${brick}.pickle \
      --pickle "$outdir/pickles/${bri}/runbrick-%(brick)s-%%(stage)s.pickle" \
      --outdir $outdir --nsigma 6 \
-     --no-wise --zoom 1400 1600 1400 1600 \
+     --no-wise \
      >> $log 2>&1
+#--zoom 1400 1600 1400 1600
 rm $dr/inq_$brick.txt
 touch $dr/ran_$brick.txt
 
