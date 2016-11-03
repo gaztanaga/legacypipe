@@ -3,8 +3,9 @@ input -- one or more Single_TractorCat() objects
       -- ref is reference Single_TractorCat()
          test is test ...
 '''
-import matplotlib
-matplotlib.use('Agg') #display backend
+if __name__ == '__main__':
+    import matplotlib
+    matplotlib.use('Agg') #display backend
 import matplotlib.pyplot as plt
 import os
 import sys
@@ -43,33 +44,33 @@ def bin_up(data_bin_by,data_for_percentile, bin_minmax=(18.,26.),nbins=20):
     return vals
 
 # Main plotting functions 
-def nobs(tractor, outname='test.png',show=False):
+def nobs(tractor, outname='test.png',savefig=False):
     '''make histograms of nobs so can compare depths of g,r,z between the two catalogues
     tractor -- Tractor catalogue in a table'''   
-    hi= np.max(tractor['decam_nobs'][:,[1,2,4]])
+    hi= np.max(tractor.get('decam_nobs')[:,[1,2,4]])
     fig,ax= plt.subplots(3,1)
     for i, band,iband in zip(range(3),['g','r','z'],[1,2,4]):
-        ax[i].hist(tractor['decam_nobs'][:,iband],\
+        ax[i].hist(tractor.get('decam_nobs')[:,iband],\
                    bins=hi+1,normed=True,cumulative=True,align='mid')
         xlab=ax[i].set_xlabel('nobs %s' % band, **kwargs.ax)
         ylab=ax[i].set_ylabel('CDF', **kwargs.ax)
-    if show == False:
+    if savefig == True:
         plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
         plt.close()
 
-def radec(tractor,outname='test.png',show=False): 
+def radec(tractor,outname='test.png',savefig=False): 
     '''ra,dec distribution of objects
     obj -- Single_TractorCat()'''
-    plt.scatter(tractor['ra'], tractor['dec'], \
+    plt.scatter(tractor.get('ra'), tractor.get('dec'), \
                 edgecolor='b',c='none',lw=1.)
     xlab=plt.xlabel('RA', **kwargs.ax)
     ylab=plt.ylabel('DEC', **kwargs.ax)
-    if show == False:
+    if savefig == True:
         plt.savefig(outname,bbox_extra_artists=[xlab,ylab], **kwargs.save)
         plt.close()
 
 
-def hist_types(obj, name=''):
+def hist_types(obj, name='',savefig=False):
     '''number of psf,exp,dev,comp, etc
     obj -- Single_TractorCat()'''
     types= ['PSF','SIMP','EXP','DEV','COMP']
@@ -87,20 +88,20 @@ def hist_types(obj, name=''):
     ylab= ax.set_ylabel("counts")
     ax.set_xticks(ind + width)
     ax.set_xticklabels(types)
-    plt.savefig(os.path.join(obj.outdir,'hist_types_%s.png' % name), \
-                bbox_extra_artists=[ylab], **kwargs.save)
-    plt.close()
+    if savefig == True:
+        plt.savefig(os.path.join(obj.outdir,'hist_types_%s.png' % name), \
+                    bbox_extra_artists=[ylab], **kwargs.save)
+        plt.close()
 
 
-def sn_vs_mag(obj, mag_minmax=(18.,26.),name=''):
-    '''plots Signal to Noise vs. mag for each band
-    obj -- Single_TractorCat()'''
+def sn_vs_mag(tractor, mag_minmax=(18.,26.),name='',savefig=False):
+    '''plots Signal to Noise vs. mag for each band'''
     min,max= mag_minmax
     # Bin up SN values
     bin_SN={}
     for band,iband in zip(['g','r','z'],[1,2,4]):
-        bin_SN[band]= bin_up(obj.t['decam_mag'][:,iband], \
-                       obj.t['decam_flux'][:,iband]*np.sqrt(obj.t['decam_flux_ivar'][:,iband]),\
+        bin_SN[band]= bin_up(tractor.get('decam_mag')[:,iband], \
+                       tractor.get('decam_flux')[:,iband]*np.sqrt(tractor.get('decam_flux_ivar')[:,iband]),\
                        bin_minmax=mag_minmax)
     #setup plot
     fig,ax=plt.subplots(1,3,figsize=(9,3),sharey=True)
@@ -120,9 +121,10 @@ def sn_vs_mag(obj, mag_minmax=(18.,26.),name=''):
         ax[cnt].set_xlim(mag_minmax)
     ylab=ax[0].set_ylabel('S/N', **kwargs.ax)
     ax[2].text(26,5,'S/N = 5  ',**kwargs.text)
-    plt.savefig(os.path.join(obj.outdir,'sn_%s.png' % name), \
-                bbox_extra_artists=[xlab,ylab], **kwargs.save)
-    plt.close()
+    if savefig == True:
+        plt.savefig(os.path.join(obj.outdir,'sn_%s.png' % name), \
+                    bbox_extra_artists=[xlab,ylab], **kwargs.save)
+        plt.close()
 
 def create_confusion_matrix(ref_tractor,test_tractor):
     '''compares MATCHED reference (truth) to test (prediction)
@@ -131,16 +133,16 @@ def create_confusion_matrix(ref_tractor,test_tractor):
     cm=np.zeros((5,5))-1
     types=['PSF','SIMP','EXP','DEV','COMP']
     for i_ref,ref_type in enumerate(types):
-        cut_ref= np.where(ref_tractor['type'] == ref_type)[0]
+        cut_ref= np.where(ref_tractor.get('type') == ref_type)[0]
         #n_ref= ref_obj.number_not_masked(['current',ref_type.lower()])
         for i_test,test_type in enumerate(types):
-            n_test= np.where(test_tractor['type'][ cut_ref ] == test_type)[0].size
+            n_test= np.where(test_tractor.get('type')[ cut_ref ] == test_type)[0].size
             if cut_ref.size > 0: cm[i_ref,i_test]= float(n_test)/cut_ref.size
             else: cm[i_ref,i_test]= np.nan
     return cm,types
 
 
-def confusion_matrix(ref_tractor,test_tractor, outname='test.png',show=False,\
+def confusion_matrix(ref_tractor,test_tractor, outname='test.png',savefig=False,\
                      ref_name='ref',test_name='test'):
     '''plot confusion matrix
     ref_obj,test_obj -- reference,test Single_TractorCat()'''
@@ -159,7 +161,7 @@ def confusion_matrix(ref_tractor,test_tractor, outname='test.png',show=False,\
                 plt.text(col,row,'%.2f' % cm[row,col],va='center',ha='center',color='yellow')
             else:
                 plt.text(col,row,'%.2f' % cm[row,col],va='center',ha='center',color='black')
-    if show == False:
+    if savefig == True:
         plt.savefig(outname,bbox_extra_artists=[xlab,ylab], **kwargs.save)
         plt.close()
 
@@ -185,7 +187,7 @@ def create_stack(answer_type,predict_type, types=['PSF','SIMP','EXP','DEV','COMP
 
 def plot_stack(cm_stack,stack_names,all_names, \
                ref_name='ref',test_name='test',\
-               outname='test.png',show=False):
+               outname='test.png',savefig=False):
     '''cm_stack -- list of single row confusion matrices
     stack_names -- list of same len as cm_stack, names for each row of cm_stack'''
     # combine list into single cm
@@ -209,25 +211,24 @@ def plot_stack(cm_stack,stack_names,all_names, \
             #if np.isnan(cm[row,col]): 
             #    plt.text(col,row,'n/a',va='center',ha='center')
             #else: plt.text(col,row,'%.2f' % cm[row,col],va='center',ha='center')
-    if show == False:
+    if savefig == True:
         plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
         plt.close()
 
 def stacked_confusion_matrix(ref_tractor,test_tractor,\
-                             ref_extra,test_extra,\
                              ref_name='ref',test_name='test', \
-                             outname='test.png',show=False):
+                             outname='test.png',savefig=False):
     cm_stack,stack_names=[],[]
     rbins= np.array([18.,20.,22.,23.,24.])
     for rmin,rmax in zip(rbins[:-1],rbins[1:]):
         # master cut
-        br_cut= np.all((ref_extra['mag'][:,2] > rmin,ref_extra['mag'][:,2] <= rmax),axis=0)
+        br_cut= np.all((ref_tractor.get('decam_mag')[:,2] > rmin,ref_tractor.get('decam_mag')[:,2] <= rmax),axis=0)
         stack_names+= ["%d < r <= %d" % (int(rmin),int(rmax))]
         cm,ans_names,all_names= create_stack(np.array(['PSF']*len(ref_tractor)),
-                                             test_tractor['type'])
+                                             test_tractor.get('type'))
         cm_stack+= [cm]
     plot_stack(cm_stack, stack_names,all_names, \
-               ref_name=ref_name,test_name=test_name,outname=outname,show=show)
+               ref_name=ref_name,test_name=test_name,outname=outname,savefig=savefig)
 
 
 def matched_dist(obj,dist, name=''):
@@ -247,14 +248,13 @@ def matched_dist(obj,dist, name=''):
     plt.close()
 
 def chi_v_gaussian(ref_tractor,test_tractor,\
-                   ref_extra,test_extra,\
-                   low=-8.,hi=8., outname='test.png',show=False):
+                   low=-8.,hi=8., outname='test.png',savefig=False):
     # Compute Chi
     chi={} 
     for band,iband in zip(['g','r','z'],[1,2,4]):
-        chi[band]= (ref_tractor['decam_flux'][:,iband]-test_tractor['decam_flux'][:,iband])/\
-                   np.sqrt( np.power(ref_tractor['decam_flux_ivar'][:,iband],-1)+\
-                            np.power(test_tractor['decam_flux_ivar'][:,iband],-1))
+        chi[band]= (ref_tractor.get('decam_flux')[:,iband]-test_tractor.get('decam_flux')[:,iband])/\
+                   np.sqrt( np.power(ref_tractor.get('decam_flux_ivar')[:,iband],-1)+\
+                            np.power(test_tractor.get('decam_flux_ivar')[:,iband],-1))
     for b_low,b_hi in zip([18,19,20,21,22,23],[19,20,21,22,23,24]):
         #loop over mag bins, one 3 panel for each mag bin
         hist= dict(g=0,r=0,z=0)
@@ -262,8 +262,8 @@ def chi_v_gaussian(ref_tractor,test_tractor,\
         stats=dict(g=0,r=0,z=0)
         # Counts per bin
         for band,iband in zip(['g','r','z'],[1,2,4]):
-            imag= np.all((b_low <= ref_extra['mag'][:,iband],\
-                          ref_extra['mag'][:,iband] < b_hi),axis=0)
+            imag= np.all((b_low <= ref_tractor.get('decam_mag')[:,iband],\
+                          ref_tractor.get('decam_mag')[:,iband] < b_hi),axis=0)
             hist[band],bins= np.histogram(chi[band][imag],\
                                     range=(low,hi),bins=50,normed=True)
             db= (bins[1:]-bins[:-1])/2
@@ -288,18 +288,18 @@ def chi_v_gaussian(ref_tractor,test_tractor,\
         ax[0].legend(loc='upper left',fontsize='medium')
         # Need unique name
         name=os.path.basename(outname).replace('.ipynb','')+'_%d-%d.png' % (b_low,b_hi) 
-        if show == False:
+        if savefig == True:
             plt.savefig(os.path.join(os.path.dirname(outname),name), \
                         bbox_extra_artists=[ti,xlab,ylab], **kwargs.save)
             plt.close()
 
-def delta_mag_vs_mag(ref_extra,test_extra, ref_name='ref',test_name='test',\
-                     ylim=None,outname='test.png',show=False):
+def delta_mag_vs_mag(ref_tractor,test_tractor, ref_name='ref',test_name='test',\
+                     ylim=None,outname='test.png',savefig=False):
     fig,ax=plt.subplots(1,3,figsize=(9,3),sharey=True)
     plt.subplots_adjust(wspace=0.25)
     for cnt,iband in zip(range(3),[1,2,4]):
-        delta= test_extra['mag'][:,iband]- ref_extra['mag'][:,iband]
-        ax[cnt].scatter(ref_extra['mag'][:,iband],delta/ref_extra['mag'][:,iband],\
+        delta= test_tractor.get('decam_mag')[:,iband]- ref_tractor.get('decam_mag')[:,iband]
+        ax[cnt].scatter(ref_tractor.get('decam_mag')[:,iband],delta/ref_tractor.get('decam_mag')[:,iband],\
                         c='b',edgecolor='b',s=5) #,c='none',lw=2.)
     for cnt,band in zip(range(3),['g','r','z']):
         xlab=ax[cnt].set_xlabel('%s AB' % band, **kwargs.ax)
@@ -308,38 +308,38 @@ def delta_mag_vs_mag(ref_extra,test_extra, ref_name='ref',test_name='test',\
         else: ax[cnt].set_ylim(ylim)
         ax[cnt].set_xlim(18,26)
     ylab=ax[0].set_ylabel('mag (%s) - mag(%s)' % (test_name,ref_name), **kwargs.ax)
-    if show == False:
+    if savefig == True:
         plt.savefig(outname, bbox_extra_artists=[xlab,ylab], **kwargs.save)
         plt.close()
 
 
-def n_per_deg2(obj,deg2=1., req_mags=[24.,23.4,22.5],name=''):
-    '''compute number density in each bin for each band mag [18,requirement]
-    deg2 -- square degrees spanned by sources in obj table
-    req_mags -- image requirements grz<=24,23.4,22.5'''
-    bin_nd={}
-    for band,iband,req in zip(['g','r','z'],[1,2,4],req_mags):
-        bin_nd[band]={}
-        bins= np.linspace(18.,req,num=15)
-        bin_nd[band]['cnt'],junk= np.histogram(obj.t['decam_mag'][:,iband], bins=bins)
-        bin_nd[band]['binc']= (bins[1:]+bins[:-1])/2.
-        # bins and junk should be identical arrays
-        assert( np.all(np.all((bins,junk),axis=0)) )
-    # Plot
-    fig,ax=plt.subplots(1,3,figsize=(9,3),sharey=True)
-    plt.subplots_adjust(wspace=0.25)
-    for cnt,band in zip(range(3),['g','r','z']):
-        ax[cnt].step(bin_nd[band]['binc'],bin_nd[band]['cnt']/deg2, \
-                     where='mid',c='b',lw=2)
-    #labels
-    for cnt,band in zip(range(3),['g','r','z']):
-        xlab=ax[cnt].set_xlabel('%s' % band, **kwargs.ax) 
-    ylab=ax[0].set_ylabel('counts/deg2', **kwargs.ax)
-    # Make space for and rotate the x-axis tick labels
-    fig.autofmt_xdate()
-    plt.savefig(os.path.join(obj.outdir,'n_per_deg2_%s.png' % name), \
-                bbox_extra_artists=[xlab,ylab], **kwargs.save)
-    plt.close()
+#def n_per_deg2(obj,deg2=1., req_mags=[24.,23.4,22.5],name=''):
+#    '''compute number density in each bin for each band mag [18,requirement]
+#    deg2 -- square degrees spanned by sources in obj table
+#    req_mags -- image requirements grz<=24,23.4,22.5'''
+#    bin_nd={}
+#    for band,iband,req in zip(['g','r','z'],[1,2,4],req_mags):
+#        bin_nd[band]={}
+#        bins= np.linspace(18.,req,num=15)
+#        bin_nd[band]['cnt'],junk= np.histogram(obj.t['decam_mag'][:,iband], bins=bins)
+#        bin_nd[band]['binc']= (bins[1:]+bins[:-1])/2.
+#        # bins and junk should be identical arrays
+#        assert( np.all(np.all((bins,junk),axis=0)) )
+#    # Plot
+#    fig,ax=plt.subplots(1,3,figsize=(9,3),sharey=True)
+#    plt.subplots_adjust(wspace=0.25)
+#    for cnt,band in zip(range(3),['g','r','z']):
+#        ax[cnt].step(bin_nd[band]['binc'],bin_nd[band]['cnt']/deg2, \
+#                     where='mid',c='b',lw=2)
+#    #labels
+#    for cnt,band in zip(range(3),['g','r','z']):
+#        xlab=ax[cnt].set_xlabel('%s' % band, **kwargs.ax) 
+#    ylab=ax[0].set_ylabel('counts/deg2', **kwargs.ax)
+#    # Make space for and rotate the x-axis tick labels
+#    fig.autofmt_xdate()
+#    plt.savefig(os.path.join(obj.outdir,'n_per_deg2_%s.png' % name), \
+#                bbox_extra_artists=[xlab,ylab], **kwargs.save)
+#    plt.close()
 
 
 
