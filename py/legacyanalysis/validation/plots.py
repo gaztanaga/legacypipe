@@ -65,6 +65,8 @@ class Kaylans(object):
         if plot_all:
             self.nobs(ref_cat,savefig=savefig) 
             self.sn_vs_mag(ref_cat, mag_minmax=(18.,26.),savefig=savefig)
+            self.barchart(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                          ref_name=ref_name,obs_name=obs_name,savefig=savefig,prefix='alldata')
             self.radec(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
                        ref_name=ref_name,obs_name=obs_name,savefig=savefig)
             self.confusion_matrix(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
@@ -74,7 +76,7 @@ class Kaylans(object):
                                        ref_name=ref_name,obs_name=obs_name,savefig=savefig,\
                                        band='z',mytype=mytype)
             self.delta_mag_vs_mag(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig,ylim=[-0.2,0.2])
             self.chi_v_gaussian(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
                                  low=-4.,hi=4.,savefig=savefig) 
         
@@ -112,30 +114,32 @@ class Kaylans(object):
             plt.savefig('%sradec.png' % prefix,bbox_extra_artists=[xlab,ylab], **kwargs.save)
             plt.close()
 
-
-    def hist_types(self,obj, prefix='',savefig=False):
-        '''number of psf,exp,dev,comp, etc
-        obj -- Single_TractorCat()'''
+    def barchart(self,ref_tractor,obs_tractor, prefix='',\
+                       ref_name='ref',obs_name='test',savefig=False):
+        '''bar chart'''
+        c1= 'b'
+        c2= 'r'
+        ###
         types= ['PSF','SIMP','EXP','DEV','COMP']
-        # the x locations for the groups
-        ind = np.arange(len(types))  
-        # the width of the bars
-        width = 0.35       
-        ht= np.zeros(len(types),dtype=int)
+        ind = np.arange(len(types))  # the x locations for the groups
+        width = 0.35       # the width of the bars
+        ###
+        ht_ref, ht_obs= np.zeros(5,dtype=int),np.zeros(5,dtype=int)
         for cnt,typ in enumerate(types):
-            # Mask to type desired
-            ht[cnt]= obj.number_not_masked(['current',typ.lower()])
-        # Plot
+            ht_ref[cnt]= np.where(ref_tractor.get('type') == typ)[0].shape[0]
+            ht_obs[cnt]= np.where(obs_tractor.get('type') == typ)[0].shape[0]
+        ###
         fig, ax = plt.subplots()
-        rects = ax.bar(ind, ht, width, color='b')
-        ylab= ax.set_ylabel("counts")
+        rects1 = ax.bar(ind, ht_ref, width, color=c1)
+        rects2 = ax.bar(ind + width, ht_obs, width, color=c2)
+        ylab= ax.set_ylabel("N")
+        ti= ax.set_title("Total: %s=%d, %s=%d" % (ref_name,len(ref_tractor),obs_name,len(obs_tractor)))
         ax.set_xticks(ind + width)
         ax.set_xticklabels(types)
-        if savefig == True:
-            plt.savefig('%shist-types.png' % prefix, \
-                        bbox_extra_artists=[ylab], **kwargs.save)
+        ax.legend((rects1[0], rects2[0]), (ref_name,obs_name))
+        if savefig:
+            plt.savefig('barchart%s.png' % prefix, bbox_extra_artists=[ylab,ti], bbox_inches='tight',dpi=200)
             plt.close()
-
 
     def sn_vs_mag(self,tractor, mag_minmax=(18.,26.),prefix='',savefig=False):
         '''plots Signal to Noise vs. mag for each band'''
@@ -346,18 +350,19 @@ class Kaylans(object):
                 plt.close()
 
     def delta_mag_vs_mag(self,ref_tractor,test_tractor, ref_name='ref',obs_name='test',\
-                         prefix='',savefig=False):
-        fig,ax=plt.subplots(1,3,figsize=(9,3),sharey=True)
-        plt.subplots_adjust(wspace=0.1)
+                         prefix='',savefig=False,ylim=[-0.1,0.1]):
+        fig,ax=plt.subplots(1,3,figsize=(12,3),sharey=True)
+        plt.subplots_adjust(wspace=0.2)
         for cnt,iband in zip(range(3),[1,2,4]):
             delta= ref_tractor.get('decam_mag')[:,iband] - test_tractor.get('decam_mag')[:,iband]
             ax[cnt].scatter(ref_tractor.get('decam_mag')[:,iband],delta,\
-                            c='b',edgecolor='b',s=5) #,c='none',lw=2.)
+                            c='none',facecolors='none',edgecolors='b',s=2,marker='o') 
         for cnt,band,maglim in zip(range(3),['g','r','z'],[24.5,23.5,22.]):
             xlab=ax[cnt].set_xlabel('%s (%s)' % (band,ref_name), **kwargs.ax)
-            ax[cnt].set_ylim(-0.1,0.1)
-            ax[cnt].set_xlim(maglim-4,maglim+1)
-        ylab=ax[0].set_ylabel('%s - %s' % (ref_name,obs_name), **kwargs.ax)
+            ax[cnt].set_ylim(ylim)
+            ax[cnt].set_xlim(maglim-3,maglim+0.5)
+        ax[cnt].yaxis.tick_right()
+        ylab=ax[0].set_ylabel('mag(%s) - mag(%s)' % (ref_name,obs_name), **kwargs.ax)
         if savefig == True:
             plt.savefig('%sdelta_mag.png' % prefix, bbox_extra_artists=[xlab,ylab], **kwargs.save)
             plt.close()
@@ -613,12 +618,16 @@ class Dustins(object):
                                       ref_name=ref_name,obs_name=obs_name,savefig=savefig)
 
     def match_distance(self,dist,range=(0,1),prefix='',savefig=False):
-        plt.hist(dist * 3600., 100,range=range)
+        fig,ax=plt.subplots()
+        ax.hist(dist * 3600., 100,range=range)
+        third_pix= (1./3)*0.262
+        ax.plot([third_pix]*2, ax.get_ylim(),'k--')
+        ax.text(1.05*third_pix, 0.9*ax.get_ylim()[1],'1/3 pixel',ha='left',fontsize='medium')
         plt.xlabel('Match distance (arcsec)')
         if savefig == True:
-            plt.savefig(os.path.join(self.outdir,'%smatch_dist.png' % prefix))
+            plt.savefig(os.path.join(self.outdir,'%smatch_dist.png' % prefix),bbox_inches='tight',dpi=150)
             plt.close()
-
+    
     def fluxflux(self,matched1,matched2,\
                  ref_name='ref',obs_name='obs',prefix='',savefig=False):
         fig,ax= plt.subplots(1,3)
