@@ -85,3 +85,21 @@ class Matcher(object):
         imiss['ref'] = np.delete(np.arange(len(ref)), imatch['ref'], axis=0)
         imiss['obs'] = np.delete(np.arange(len(obs)), imatch['obs'], axis=0)
         return imatch,imiss,d2d
+
+    def nearest_neighbors_within(self,ref,obs,within=1./3600,min_nn=1,max_nn=5):
+        '''Find obs ra,dec that are within dist of ref ra,dec
+        default=1 arcsec'''
+        # cat1 --> ref cat
+        # cat2 --> cat matching to the ref cat
+        cat1 = SkyCoord(ra=ref.get('ra')*units.degree, dec=ref.get('dec')*units.degree)
+        cat2 = SkyCoord(ra=obs.get('ra')*units.degree, dec=obs.get('dec')*units.degree)
+        ref_nn,obs_nn,dist={},{},{}
+        for nn in range(min_nn,max_nn+1):
+            idx, d2d, d3d = cat1.match_to_catalog_3d(cat2,nthneighbor=nn)
+            b= np.array(d2d) <= within
+            ref_nn[str(nn)]= np.arange(len(ref))[b]
+            obs_nn[str(nn)]= np.array(idx)[b]
+            dist[str(nn)]= np.array(d2d)[b]
+            print("within 1arcsec, nn=%d, %d/%d" % (nn,ref_nn[str(nn)].size,len(ref)))
+        return ref_nn,obs_nn,dist
+ 
