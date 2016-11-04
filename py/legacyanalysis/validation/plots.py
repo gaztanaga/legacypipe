@@ -57,22 +57,26 @@ def bin_up(data_bin_by,data_for_percentile, bin_minmax=(18.,26.),nbins=20):
 # Kaylans plots
 class Kaylans(object):
     def __init__(self,ref_cat,obs_cat,imatch,\
-                 ref_name='ref',obs_name='obs',savefig=False):
+                 ref_name='ref',obs_name='obs',savefig=False,\
+                 plot_all=True):
         ##plot_all(self,ref_cat,obs_cat,\
         ##plot_all(self,ref_cat,obs_cat,\
         ##        ref_name='ref',obs_name='obs')
-        self.nobs(ref_cat,savefig=savefig) 
-        self.sn_vs_mag(ref_cat, mag_minmax=(18.,26.),savefig=savefig)
-        self.radec(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                   ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.confusion_matrix(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                               ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.stacked_confusion_matrix(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                               ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.delta_mag_vs_mag(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                              ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.chi_v_gaussian(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                             low=-4.,hi=4.,savefig=savefig) 
+        if plot_all:
+            self.nobs(ref_cat,savefig=savefig) 
+            self.sn_vs_mag(ref_cat, mag_minmax=(18.,26.),savefig=savefig)
+            self.radec(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                       ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+            self.confusion_matrix(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                   ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+            for mytype in ['PSF','SIMP','DEV','COMP']:
+                self.stacked_confusion_matrix(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                       ref_name=ref_name,obs_name=obs_name,savefig=savefig,\
+                                       band='z',mytype=mytype)
+            self.delta_mag_vs_mag(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+            self.chi_v_gaussian(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                 low=-4.,hi=4.,savefig=savefig) 
         
     
     def nobs(self,tractor, prefix='',savefig=False):
@@ -260,20 +264,22 @@ class Kaylans(object):
     def stacked_confusion_matrix(self,ref_matched,obs_matched,\
                                  ref_name='ref',obs_name='test', \
                                  outname='test.png',savefig=False,\
-                                 band='z',mytype='PSF'):
+                                 band='z',mytype='PSF',prefix=''):
         cm_stack,stack_names=[],[]
-        magbins= np.array([18.,20.,22.,23.,24.])
         iband= dict(g=1,r=2,z=4)[band]
-        for magmin,magmax in zip(magbins[:-1],magbins[1:]):
+        for magmin,magmax in zip([18,20,22,23.5],[20,22,23.5,24.5]):
             band_and_type= (ref_matched.get('decam_mag')[:,iband] > magmin)* \
                            (ref_matched.get('decam_mag')[:,iband] <= magmax)*\
                            (ref_matched.get('type') == mytype)
-            stack_names+= ["%s: %d < %s <= %d" % (mytype,int(magmin),band,int(magmax))]
+            stack_names+= ["%s: %.1f < %s < %.1f" % (mytype,magmin,band,magmax)]
             cm,ans_names,all_names= self.create_stack(ans=ref_matched.get('type')[band_and_type],\
                                                       pred=obs_matched.get('type')[band_and_type])
+            # If band_and_type is empty, fill with -1
+            if len(cm) == 0: 
+                cm,ans_names= np.zeros((1,5))-1, set([mytype])
             cm_stack+= [cm]
         self.plot_stack(cm_stack, stack_names,all_names, \
-                   ref_name=ref_name,obs_name=obs_name,prefix='%s-%s-' % (mytype,band),savefig=savefig)
+                   ref_name=ref_name,obs_name=obs_name,prefix='%s%s-%s-' % (prefix,mytype,band),savefig=savefig)
 
 
     def matched_dist(self,obj,dist, prefix=''):
@@ -578,34 +584,36 @@ class EnriqueCosmos(object):
 
 class Dustins(object):
     def __init__(self,ref_cat,obs_cat,imatch,d2d,\
-                 ref_name='ref',obs_name='obs',savefig=False):
+                 ref_name='ref',obs_name='obs',savefig=False,\
+                 plot_all=True):
         #plot_all(self,ref_cat,obs_cat,
         #        ref_name='ref',obs_name='obs')
         self.outdir='./'
         self.cuts= Cuts4MatchedCats(ref_cat[ imatch['ref']], obs_cat[imatch['obs']])
         # Plot
-        self.match_distance(d2d,savefig=savefig)
-        self.fluxflux(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.fluxdeltaflux(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.grz_ratio_fluxerr(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.magmag(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.magdeltamag(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.deltamag_err(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.deltamag_errbars(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.stephist(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig)
-        self.curvehist(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
-                                  ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+        if plot_all:
+            self.match_distance(d2d,savefig=savefig)
+            self.fluxflux(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                      ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+            self.fluxdeltaflux(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                      ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+            self.grz_ratio_fluxerr(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                      ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+            self.magmag(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                      ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+            self.magdeltamag(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                      ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+            self.deltamag_err(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                      ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+            self.deltamag_errbars(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                      ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+            self.stephist(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                      ref_name=ref_name,obs_name=obs_name,savefig=savefig)
+            self.curvehist(ref_cat[ imatch['ref'] ],obs_cat[ imatch['obs'] ],\
+                                      ref_name=ref_name,obs_name=obs_name,savefig=savefig)
 
-    def match_distance(self,dist,prefix='',savefig=False):
-        plt.hist(dist * 3600., 100,range=(0,1))
+    def match_distance(self,dist,range=(0,1),prefix='',savefig=False):
+        plt.hist(dist * 3600., 100,range=range)
         plt.xlabel('Match distance (arcsec)')
         if savefig == True:
             plt.savefig(os.path.join(self.outdir,'%smatch_dist.png' % prefix))
@@ -751,7 +759,7 @@ class Dustins(object):
                 matched1.decam_flux[:,iband] + matched2.decam_flux[:,iband]) / 2.)
 
             K = np.flatnonzero(self.cuts.good[band])
-            P = np.flatnonzero(self.cuts.good[band] * cuts.psf1 * cuts.psf2)
+            P = np.flatnonzero(self.cuts.good[band] * self.cuts.psf1 * self.cuts.psf2)
 
             ax[cnt].errorbar(mag1[K], mag2[K] - mag1[K], fmt='.', color=cc,
                          xerr=magerr1[K], yerr=magerr2[K], alpha=0.1)
@@ -807,7 +815,7 @@ class Dustins(object):
                 matched1.decam_flux[:,iband] + matched2.decam_flux[:,iband]) / 2.)
 
             K = np.flatnonzero(self.cuts.good[band])
-            P = np.flatnonzero(self.cuts.good[band] * cuts.psf1 * cuts.psf2)
+            P = np.flatnonzero(self.cuts.good[band] * self.cuts.psf1 * self.cuts.psf2)
 
             magbins = np.arange(16, 24.001, 0.5)
             y = (mag2 - mag1) / np.hypot(magerr1, magerr2)
@@ -980,62 +988,62 @@ class Dustins(object):
             plt.savefig(os.path.join(self.outdir,'%sstephist_%s.png' % (prefix,band)))
             plt.close()
 
-    def curvehist(self,matched1,matched2,\
-              ref_name='ref',obs_name='obs',prefix='',savefig=False):
-        fig,ax= plt.subplots(1,3)
-        for cnt,iband,band,cc in [(0,1,'g','g'),(1,2,'r','r'),(2,4,'z','m')]:
-            mag1, magerr1 = NanoMaggies.fluxErrorsToMagErrors(
-                matched1.decam_flux[:,iband], matched1.decam_flux_ivar[:,iband])
-            mag2, magerr2 = NanoMaggies.fluxErrorsToMagErrors(
-                matched2.decam_flux[:,iband], matched2.decam_flux_ivar[:,iband])
-
-            meanmag = NanoMaggies.nanomaggiesToMag((
-                matched1.decam_flux[:,iband] + matched2.decam_flux[:,iband]) / 2.)
-
-            K = np.flatnonzero(self.cuts.good[band])
-            P = np.flatnonzero(self.cuts.good[band] * self.cuts.psf1 * self.cuts.psf2)
-
-            #magbins = np.append([16, 18], np.arange(20, 24.001, 0.5))
-            if band == 'g':
-                magbins = [20, 24]
-            elif band == 'r':
-                magbins = [20, 23.5]
-            elif band == 'z':
-                magbins = [20, 22.5]
-
-            slo,shi = -5,5
-            ha = dict(bins=25, range=(slo,shi), histtype='step', normed=True)
-            y = (mag2 - mag1) / np.hypot(magerr1, magerr2)
-            midmag = []
-            nn = []
-            rgbs = []
-            lt,lp = [],[]
-            I_empty=True
-            for bini,(mlo,mhi) in enumerate(zip(magbins, magbins[1:])):
-                I = P[(mag1[P] >= mlo) * (mag1[P] < mhi)]
-                if len(I) == 0:
-                    continue
-                I_empty=False
-                ybin = y[I]
-                rgb = [0.,0.,0.]
-                rgb[0] = float(bini) / (len(magbins)-1)
-                rgb[2] = 1. - rgb[0]
-                n,b,p = plt.hist(ybin, color=rgb, **ha)
-                lt.append('mag %g to %g' % (mlo,mhi))
-                lp.append(p[0])
-                midmag.append((mlo+mhi)/2.)
-                nn.append(n)
-                rgbs.append(rgb)
-
-            if I_empty == False:
-                bincenters = b[:-1] + (b[1]-b[0])/2.
-                lp = []
-                for n,rgb,mlo,mhi in zip(nn, rgbs, magbins, magbins[1:]):
-                    p = ax[cnt].plot(bincenters, n, '-', color=rgb)
-                    lp.append(p[0])
-                ax[cnt].plot(bincenters, gaussint[::2], 'k-', alpha=0.5, lw=2)
-                ax[cnt].legend(lp, lt)
-                ax[cnt].set_xlim(slo,shi)
-        if savefig == True:
-            plt.savefig(os.path.join(self.outdir,'%scurvehist_%s.png' % (prefix,band)))
-            plt.close()
+#    def curvehist(self,matched1,matched2,\
+#              ref_name='ref',obs_name='obs',prefix='',savefig=False):
+#        fig,ax= plt.subplots(1,3)
+#        for cnt,iband,band,cc in [(0,1,'g','g'),(1,2,'r','r'),(2,4,'z','m')]:
+#            mag1, magerr1 = NanoMaggies.fluxErrorsToMagErrors(
+#                matched1.decam_flux[:,iband], matched1.decam_flux_ivar[:,iband])
+#            mag2, magerr2 = NanoMaggies.fluxErrorsToMagErrors(
+#                matched2.decam_flux[:,iband], matched2.decam_flux_ivar[:,iband])
+#
+#            meanmag = NanoMaggies.nanomaggiesToMag((
+#                matched1.decam_flux[:,iband] + matched2.decam_flux[:,iband]) / 2.)
+#
+#            K = np.flatnonzero(self.cuts.good[band])
+#            P = np.flatnonzero(self.cuts.good[band] * self.cuts.psf1 * self.cuts.psf2)
+#
+#            #magbins = np.append([16, 18], np.arange(20, 24.001, 0.5))
+#            if band == 'g':
+#                magbins = [20, 24]
+#            elif band == 'r':
+#                magbins = [20, 23.5]
+#            elif band == 'z':
+#                magbins = [20, 22.5]
+#
+#            slo,shi = -5,5
+#            ha = dict(bins=25, range=(slo,shi), histtype='step', normed=True)
+#            y = (mag2 - mag1) / np.hypot(magerr1, magerr2)
+#            midmag = []
+#            nn = []
+#            rgbs = []
+#            lt,lp = [],[]
+#            I_empty=True
+#            for bini,(mlo,mhi) in enumerate(zip(magbins, magbins[1:])):
+#                I = P[(mag1[P] >= mlo) * (mag1[P] < mhi)]
+#                if len(I) == 0:
+#                    continue
+#                I_empty=False
+#                ybin = y[I]
+#                rgb = [0.,0.,0.]
+#                rgb[0] = float(bini) / (len(magbins)-1)
+#                rgb[2] = 1. - rgb[0]
+#                n,b,p = plt.hist(ybin, color=rgb, **ha)
+#                lt.append('mag %g to %g' % (mlo,mhi))
+#                lp.append(p[0])
+#                midmag.append((mlo+mhi)/2.)
+#                nn.append(n)
+#                rgbs.append(rgb)
+#
+#            if I_empty == False:
+#                bincenters = b[:-1] + (b[1]-b[0])/2.
+#                lp = []
+#                for n,rgb,mlo,mhi in zip(nn, rgbs, magbins, magbins[1:]):
+#                    p = ax[cnt].plot(bincenters, n, '-', color=rgb)
+#                    lp.append(p[0])
+#                ax[cnt].plot(bincenters, gaussint[::2], 'k-', alpha=0.5, lw=2)
+#                ax[cnt].legend(lp, lt)
+#                ax[cnt].set_xlim(slo,shi)
+#        if savefig == True:
+#            plt.savefig(os.path.join(self.outdir,'%scurvehist_%s.png' % (prefix,band)))
+#            plt.close()
