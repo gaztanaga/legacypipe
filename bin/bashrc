@@ -1,5 +1,7 @@
 ## ~/.bashrc file portion for 'desiproc' user @ NERSC.
 
+alias myjobs='squeue -u desiproc'
+
 export TMPDIR=$SCRATCH/tmp
 mkdir -p $TMPDIR
 
