@@ -1,20 +1,15 @@
-#!/bin/bash -l
+#!/bin/bash 
 
-#SBATCH -p shared
-#SBATCH -n 12
-#SBATCH -t 02:00:00
-#SBATCH --account=desi
-#SBATCH -J dr3-mzls-qdo
-#SBATCH -o dr3-mzls-qdo.o%j
-#SBATCH --mail-user=kburleigh@lbl.gov
-#SBATCH --mail-type=END,FAIL
-#SBATCH -L SCRATCH
+set -x
+brick="$1"
+bri="$(echo $brick | head -c 3)"
 
 source /scratch1/scratchdirs/desiproc/dr3-mzls/bashrc
-outdir=/scratch1/scratchdirs/desiproc/data-releases/dr3-mzls-qdo
+export PYTHONPATH=/scratch1/scratchdirs/desiproc/code/qdo:$PYTHONPATH
+export PATH=/scratch1/scratchdirs/desiproc/code/qdo/bin:$PATH
 
-#brick="$1"
-bri="$(echo $brick | head -c 3)"
+outdir=/scratch1/scratchdirs/desiproc/data-releases/dr3-mzls-qdo
+rundir=$SCRATCH/code/legacypipe/py
 
 log="$outdir/logs/$bri/$brick/log.$SLURM_JOBID"
 mkdir -p $(dirname $log)
@@ -37,10 +32,11 @@ echo >> $log
 echo -e "\nStarting on ${NERSC_HOST} $(hostname)\n" >> $log
 echo "-----------------------------------------------------------------------------------------" >> $log
 
-threads=6
+threads=8
 export OMP_NUM_THREADS=$threads
 
 echo outdir="$outdir", brick="$brick"
+cd $rundir
 srun -n 1 -c $OMP_NUM_THREADS python legacypipe/runbrick.py \
      --brick $brick \
      --skip \
@@ -56,10 +52,6 @@ srun -n 1 -c $OMP_NUM_THREADS python legacypipe/runbrick.py \
 #    --force-all --no-write \
 #    --skip-calibs \
 #
-echo DONE
-
-
-
-
+echo dr3-mzls-qdo DONE $SLURM_JOBID
 
 

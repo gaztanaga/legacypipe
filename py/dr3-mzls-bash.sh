@@ -2,7 +2,7 @@
 
 #SBATCH -p shared
 #SBATCH -n 12
-#SBATCH -t 00:10:00
+#SBATCH -t 01:00:00
 #SBATCH --account=desi
 #SBATCH -J dr3-mzls-bash
 #SBATCH -o dr3-mzls-bash.o%j
@@ -57,10 +57,6 @@ rm $statdir/inq_$brick.txt
 #    --force-all --no-write \
 #    --skip-calibs \
 #
-echo DONE
-
-
-
-
+echo dr3-mzls-bash DONE $SLURM_JOBID
 
 
