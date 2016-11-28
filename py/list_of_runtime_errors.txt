@@ -1,0 +1,4 @@
+# job starts running but immediately crashes with 
+srun: error: slurm_receive_msg: Socket timed out on send/recv operation
+srun: error: Unable to confirm allocation for job 2648837: Socket timed out on send/recv operation
+
