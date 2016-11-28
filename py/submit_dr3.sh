@@ -2,7 +2,7 @@
 
 #SBATCH -p debug
 #SBATCH -N 7
-#SBATCH -t 00:30:00
+#SBATCH -t 00:20:00
 #SBATCH -J mpiv3
 #SBATCH -o mpiv3.o%j
 #SBATCH --mail-user=kburleigh@lbl.gov

@@ -5,6 +5,35 @@ import os
 from collections import Counter
 from astrometry.util.fits import fits_table, merge_tables
 
+def mzls_v2v3(ver=3):
+    basedir = os.environ['LEGACY_SURVEY_DIR']
+    cam = 'mosaic'
+    image_basedir = os.path.join(basedir, 'images')
+    TT = []
+
+    dirnms_list=glob('/project/projectdirs/cosmo/staging/mosaicz/MZLS_CP/CP201602*v%d' % ver)
+    print('dirnms_list=',dirnms_list)
+    for fn,dirnms in [
+        ('/global/homes/a/arjundey/ZeroPoints/mzls-zpt-2016feb-v%d.fits' % ver,
+         dirnms_list),
+        ]:
+        T = fits_table(fn)
+        normalize_zeropoints(fn, dirnms, image_basedir, cam, T=T)
+        TT.append(T)
+    T = merge_tables(TT)
+
+    I = np.flatnonzero(T.fwhm == 0)
+    if len(I):
+        T.fwhm[I] = T.seeing[I] / 0.262
+
+    outfn = 'survey-ccds-mzls-2016feb-v%d.fits' % ver
+    T.writeto(outfn)
+    print('Wrote', outfn)
+
+    for fn in [outfn]:
+        os.system('gzip --best ' + fn)
+
+
 def mzls_to_20160315():
     basedir = os.environ['LEGACY_SURVEY_DIR']
     cam = 'mosaic'
@@ -426,7 +455,8 @@ if __name__ == '__main__':
     #decals_dr3_check_wcsfailed()
     #decals_dr3_plus()
     #decals_run16()
-    mzls_to_20160315()
+    #mzls_to_20160315()
+    mzls_v2v3(ver=3)
     sys.exit(0)
     
     basedir = './deep2f3'
